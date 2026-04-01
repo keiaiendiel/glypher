@@ -1,0 +1,3296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GlyphGarden</title>
+<style>
+/* ===================================================================
+   GlyphGarden — Generative ASCII/Glyph Visual Processor
+   =================================================================== */
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+    --bg-primary: #0a0a0a;
+    --bg-secondary: #101010;
+    --bg-tertiary: #181818;
+    --bg-control: #131313;
+    --accent: #e8e8e8;
+    --accent-dim: #333;
+    --accent-subtle: rgba(232, 232, 232, 0.08);
+    --text-primary: #e8e8e8;
+    --text-secondary: #888;
+    --text-dim: #555;
+    --border: #1c1c1c;
+    --border-light: #252525;
+    --font-ui: 'Inter', -apple-system, system-ui, sans-serif;
+    --font-mono: 'Degular Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    --sidebar-width: 320px;
+    --radius: 4px;
+    --radius-sm: 4px;
+}
+
+@font-face {
+    font-family: 'Degular Mono';
+    src: local('Degular Mono'), local('DegularMono-Regular'), local('Degular Mono Regular');
+}
+
+html, body {
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    font-size: 12px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* -- Layout -------------------------------------------------------- */
+
+.app {
+    display: grid;
+    grid-template-columns: var(--sidebar-width) 1fr;
+    height: 100vh;
+}
+
+/* -- Sidebar ------------------------------------------------------- */
+
+.sidebar {
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.app-header {
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.app-header h1 {
+    font-family: var(--font-ui);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    color: var(--text-primary);
+}
+
+.app-header .subtitle {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 2px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    font-weight: 400;
+}
+
+.controls {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-bottom: 20px;
+}
+
+.controls::-webkit-scrollbar { width: 4px; }
+.controls::-webkit-scrollbar-track { background: transparent; }
+.controls::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.controls::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
+
+/* -- Sections ------------------------------------------------------ */
+
+.section { border-bottom: 1px solid var(--border); }
+
+.section > summary {
+    display: flex;
+    align-items: center;
+    padding: 10px 20px;
+    font-family: var(--font-ui);
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    transition: color 0.15s;
+}
+
+.section > summary::-webkit-details-marker { display: none; }
+
+.section > summary::before {
+    content: '+';
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    margin-right: 8px;
+    font-size: 11px;
+    font-weight: 300;
+    color: var(--text-dim);
+    transition: transform 0.15s;
+}
+
+.section[open] > summary::before {
+    content: '-';
+}
+
+.section > summary:hover { color: var(--text-secondary); }
+
+.section-body { padding: 6px 20px 16px; }
+
+/* -- Controls ------------------------------------------------------ */
+
+.control-row {
+    margin-bottom: 10px;
+}
+
+.control-row:last-child { margin-bottom: 0; }
+
+.control-row > label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text-secondary);
+    margin-bottom: 5px;
+}
+
+.control-row > label .val {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Slider track */
+.control-row input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 2px;
+    background: var(--border-light);
+    border-radius: 1px;
+    outline: none;
+    cursor: pointer;
+}
+
+.control-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--text-primary);
+    cursor: pointer;
+    transition: transform 0.1s, background 0.1s;
+    border: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+
+.control-row input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+}
+
+.control-row input[type="range"]::-webkit-slider-thumb:active {
+    background: var(--accent);
+}
+
+.control-row input[type="range"]::-moz-range-thumb {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--text-primary);
+    cursor: pointer;
+    border: none;
+}
+
+.control-row select,
+.control-row input[type="number"],
+.control-row input[type="text"],
+.control-row input[type="color"] {
+    width: 100%;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    font-size: 11px;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.control-row select:focus,
+.control-row input[type="number"]:focus,
+.control-row input[type="text"]:focus {
+    border-color: var(--text-dim);
+}
+
+.control-row select { cursor: pointer; }
+.control-row select option { background: var(--bg-primary); }
+
+.control-row input[type="color"] {
+    padding: 2px;
+    height: 28px;
+    cursor: pointer;
+}
+
+.control-row input[type="checkbox"] {
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
+.checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.checkbox-row label {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    color: var(--text-secondary);
+    cursor: pointer;
+}
+
+.input-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.input-row input[type="number"] { flex: 1; font-family: var(--font-mono); }
+.input-row span { color: var(--text-dim); font-size: 11px; }
+
+/* -- Upload Area --------------------------------------------------- */
+
+.upload-area {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    margin-bottom: 12px;
+}
+
+.upload-area:hover,
+.upload-area.dragover {
+    border-color: var(--text-dim);
+    background: rgba(255, 255, 255, 0.015);
+}
+
+.upload-area p {
+    font-family: var(--font-ui);
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 6px;
+}
+
+.upload-area svg {
+    color: var(--text-dim);
+    opacity: 0.5;
+}
+
+.upload-area input { display: none; }
+
+/* -- Buttons ------------------------------------------------------- */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 14px;
+    font-family: var(--font-ui);
+    font-size: 11px;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.12s;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.btn:hover { border-color: var(--text-dim); background: var(--bg-tertiary); }
+.btn:active { transform: scale(0.98); }
+.btn:disabled { opacity: 0.25; cursor: default; pointer-events: none; }
+
+.btn-primary {
+    background: var(--accent-dim);
+    border-color: transparent;
+    color: var(--accent);
+}
+
+.btn-primary:hover { background: #444; border-color: transparent; }
+
+.btn-small {
+    padding: 4px 10px;
+    font-size: 10px;
+}
+
+.btn-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.btn-row .btn { flex: 1; min-width: 0; }
+
+.res-presets {
+    display: flex;
+    gap: 3px;
+}
+
+.res-preset {
+    flex: 1;
+    padding: 5px 4px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 500;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.12s;
+}
+
+.res-preset:hover { color: var(--text-primary); border-color: var(--text-dim); }
+.res-preset.active { background: var(--text-primary); color: var(--bg-primary); border-color: var(--text-primary); }
+
+/* -- Info Display -------------------------------------------------- */
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    color: var(--text-dim);
+    padding: 4px 0;
+}
+
+.info-row .info-val {
+    font-family: var(--font-mono);
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+/* -- Viewport ------------------------------------------------------ */
+
+.viewport {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-primary);
+    overflow: hidden;
+}
+
+.canvas-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+}
+
+.canvas-container canvas {
+    object-fit: contain;
+    max-width: 96%;
+    max-height: 96%;
+    background: #000;
+}
+
+.placeholder {
+    text-align: center;
+    color: var(--text-dim);
+    font-family: var(--font-ui);
+    font-size: 13px;
+    letter-spacing: 0.02em;
+}
+
+.placeholder svg {
+    display: block;
+    margin: 0 auto 12px;
+    opacity: 0.2;
+}
+
+/* -- Status Bar ---------------------------------------------------- */
+
+.status-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 16px;
+    border-top: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    flex-shrink: 0;
+    background: var(--bg-secondary);
+}
+
+.status-bar .status-item {
+    font-variant-numeric: tabular-nums;
+}
+
+.status-bar .status-sep {
+    color: var(--border-light);
+    font-size: 6px;
+}
+
+/* -- Progress Bar -------------------------------------------------- */
+
+.progress-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.88);
+    z-index: 10;
+}
+
+.progress-overlay .progress-text {
+    font-family: var(--font-ui);
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+}
+
+.progress-bar {
+    width: 200px;
+    height: 2px;
+    background: var(--bg-tertiary);
+    border-radius: 1px;
+    overflow: hidden;
+}
+
+.progress-bar .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.1s;
+}
+
+/* -- Footer -------------------------------------------------------- */
+
+.site-footer {
+    padding: 10px 20px;
+    font-family: var(--font-ui);
+    font-size: 10px;
+    color: var(--text-dim);
+    text-align: center;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.site-footer a {
+    color: var(--text-secondary);
+    text-decoration: none;
+}
+
+.site-footer a:hover { color: var(--text-primary); }
+
+/* -- View Mode Buttons --------------------------------------------- */
+
+.view-modes {
+    display: flex;
+    gap: 2px;
+    background: var(--bg-primary);
+    border-radius: 20px;
+    padding: 2px;
+    border: 1px solid var(--border);
+}
+
+.view-mode-btn {
+    padding: 4px 10px;
+    font-family: var(--font-ui);
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    border-radius: 16px;
+    transition: all 0.12s;
+}
+
+.view-mode-btn:hover { color: var(--text-secondary); }
+.view-mode-btn.active { background: var(--text-primary); color: var(--bg-primary); }
+
+/* -- Animation Controls -------------------------------------------- */
+
+.anim-transport {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.anim-transport .btn { padding: 5px 10px; }
+
+/* -- Video Controls ------------------------------------------------ */
+
+.video-controls {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    margin-top: 6px;
+}
+
+.video-controls .btn { padding: 5px 10px; }
+
+/* -- Help Tooltip -------------------------------------------------- */
+
+.help-hint {
+    font-family: var(--font-ui);
+    font-size: 10px;
+    color: var(--text-dim);
+    line-height: 1.5;
+    padding: 8px 0 2px;
+    border-top: 1px solid var(--border);
+    margin-top: 8px;
+}
+
+.help-hint code {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    background: var(--bg-primary);
+    padding: 1px 4px;
+    border-radius: 2px;
+    color: var(--text-secondary);
+}
+
+.view-help {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 6px;
+    line-height: 1.6;
+}
+
+.video-info-badge {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-dim);
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 2px 6px;
+    margin-top: 4px;
+}
+
+/* -- Hidden -------------------------------------------------------- */
+
+.hidden { display: none !important; }
+
+/* -- Responsive ---------------------------------------------------- */
+
+@media (max-width: 900px) {
+    .app {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr auto;
+    }
+    .sidebar {
+        order: 2;
+        max-height: 50vh;
+        border-right: none;
+        border-top: 1px solid var(--border);
+    }
+    .viewport { order: 1; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+    <!-- === Sidebar === -->
+    <aside class="sidebar">
+        <header class="app-header">
+            <h1>GlyphGarden</h1>
+            <p class="subtitle">Generative ASCII Visual Processor</p>
+        </header>
+
+        <div class="controls" id="controls">
+
+            <!-- Input & Output -->
+            <details class="section" open>
+                <summary>Input & Output</summary>
+                <div class="section-body">
+                    <div class="upload-area" id="uploadArea">
+                        <input type="file" id="fileInput" accept="image/*,video/*">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                        </svg>
+                        <p>Drop image or video</p>
+                    </div>
+
+                    <div id="videoControlsRow" class="video-controls" style="display:none;">
+                        <button class="btn btn-small" id="videoPlayPause">&#9654; Play</button>
+                        <button class="btn btn-small" id="videoStop">&#9632; Stop</button>
+                    </div>
+
+                    <div class="control-row">
+                        <label>Aspect Ratio</label>
+                        <select id="aspectRatio">
+                            <option value="original">Original</option>
+                            <option value="16:9">16:9</option>
+                            <option value="9:16">9:16</option>
+                            <option value="4:3">4:3</option>
+                            <option value="3:4">3:4</option>
+                            <option value="1:1">1:1</option>
+                        </select>
+                    </div>
+
+                    <div class="control-row">
+                        <label>Export Scale</label>
+                        <div class="res-presets">
+                            <button class="res-preset" data-scale="0.5">&frac12; rec</button>
+                            <button class="res-preset active" data-scale="1">1x</button>
+                            <button class="res-preset" data-scale="2">2x</button>
+                            <button class="res-preset" data-scale="3">3x</button>
+                            <button class="res-preset" data-scale="4">4x</button>
+                        </div>
+                    </div>
+
+                    <div class="control-row">
+                        <label>Preview Quality</label>
+                        <select id="previewQuality">
+                            <option value="full">Full (source resolution)</option>
+                            <option value="draft" selected>Draft (fast, 800px max)</option>
+                        </select>
+                    </div>
+
+                    <div id="videoInfoBadge" class="video-info-badge" style="display:none;"></div>
+
+                    <div class="info-row">
+                        <span>Output</span>
+                        <span class="info-val" id="outputDims">&mdash;</span>
+                    </div>
+                </div>
+            </details>
+
+            <!-- Glyph Layer -->
+            <details class="section" open>
+                <summary>Glyph Layer</summary>
+                <div class="section-body">
+                    <div class="control-row">
+                        <label>Character Set</label>
+                        <select id="charSet">
+                            <option value="luminosity">Luminosity Values (0.83)</option>
+                            <option value="ascii" selected>ASCII Density</option>
+                            <option value="blocks">Block Elements</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+
+                    <div class="control-row hidden" id="customCharsRow">
+                        <label>Custom Characters</label>
+                        <input type="text" id="customChars" value=" .:-=+*#%@" placeholder="Characters light to dark">
+                    </div>
+
+                    <div class="control-row">
+                        <label>Grid Density <span class="val" id="gridColsVal">100</span></label>
+                        <input type="range" id="gridCols" min="10" max="200" step="1" value="100">
+                    </div>
+
+                    <div class="control-row">
+                        <label>Font</label>
+                        <select id="fontFamily">
+                            <option value="">Default (Monospace)</option>
+                            <option value="monospace">monospace</option>
+                            <option value="'Courier New', monospace">Courier New</option>
+                            <option value="'SF Mono', monospace">SF Mono</option>
+                            <option value="'Menlo', monospace">Menlo</option>
+                            <option value="'Consolas', monospace">Consolas</option>
+                            <option value="'Fira Code', monospace">Fira Code</option>
+                            <option value="'JetBrains Mono', monospace">JetBrains Mono</option>
+                            <option value="'Monaco', monospace">Monaco</option>
+                            <option value="'Andale Mono', monospace">Andale Mono</option>
+                            <option value="Helvetica, Arial, sans-serif">Helvetica</option>
+                            <option value="'Arial Black', sans-serif">Arial Black</option>
+                            <option value="Georgia, serif">Georgia</option>
+                            <option value="'Times New Roman', serif">Times New Roman</option>
+                            <option value="'Impact', sans-serif">Impact</option>
+                            <option value="'Comic Sans MS', cursive">Comic Sans MS</option>
+                            <option value="custom">Custom...</option>
+                        </select>
+                    </div>
+
+                    <div class="control-row hidden" id="customFontRow">
+                        <label>Custom Font Name</label>
+                        <input type="text" id="customFont" placeholder="e.g. 'Roboto Mono', monospace">
+                    </div>
+
+                    <div class="control-row">
+                        <label>Char Color</label>
+                        <input type="color" id="charColor" value="#ffffff">
+                    </div>
+
+                    <div class="control-row">
+                        <label>BG Color</label>
+                        <input type="color" id="bgColor" value="#000000">
+                    </div>
+
+                    <div class="control-row">
+                        <label>BG Opacity <span class="val" id="bgOpacityVal">100%</span></label>
+                        <input type="range" id="bgOpacity" min="0" max="100" step="1" value="100">
+                    </div>
+
+                    <div class="control-row" id="precisionRow" style="display:none;">
+                        <label>Decimal Precision <span class="val" id="decimalPrecisionVal">2</span></label>
+                        <input type="range" id="decimalPrecision" min="1" max="3" step="1" value="2">
+                    </div>
+
+                    <div class="control-row">
+                        <label>Randomize <span class="val" id="randomizeVal">0%</span></label>
+                        <input type="range" id="randomize" min="0" max="100" step="1" value="0">
+                    </div>
+                </div>
+            </details>
+
+            <!-- Image Layer -->
+            <details class="section" open>
+                <summary>Image Layer</summary>
+                <div class="section-body">
+                    <div class="control-row">
+                        <label>Pre-Blur <span class="val" id="preBlurVal">0</span></label>
+                        <input type="range" id="preBlur" min="0" max="10" step="0.5" value="0">
+                    </div>
+
+                    <div class="control-row">
+                        <label>Brightness <span class="val" id="brightnessVal">1.00</span></label>
+                        <input type="range" id="brightness" min="0.5" max="2.0" step="0.05" value="1.0">
+                    </div>
+
+                    <div class="control-row">
+                        <label>Contrast <span class="val" id="contrastVal">1.50</span></label>
+                        <input type="range" id="contrast" min="0.5" max="3.0" step="0.05" value="1.5">
+                    </div>
+
+                    <div class="control-row">
+                        <label>Gamma <span class="val" id="gammaVal">1.00</span></label>
+                        <input type="range" id="gamma" min="0.5" max="2.0" step="0.05" value="1.0">
+                    </div>
+
+                    <div class="control-row">
+                        <label>Dither Method</label>
+                        <select id="ditherMethod">
+                            <option value="floyd-steinberg">Floyd-Steinberg</option>
+                            <option value="ordered">Ordered (Bayer)</option>
+                            <option value="halftone">Dot Halftone</option>
+                        </select>
+                    </div>
+
+                    <div class="control-row">
+                        <label>Dither Scale <span class="val" id="ditherScaleVal">2</span></label>
+                        <input type="range" id="ditherScale" min="1" max="8" step="1" value="2">
+                    </div>
+                </div>
+            </details>
+
+            <!-- Mask / Blend -->
+            <details class="section" open>
+                <summary>Mask / Blend</summary>
+                <div class="section-body">
+                    <div class="control-row">
+                        <label>Mask Mode</label>
+                        <select id="maskMode">
+                            <option value="luminosity">Luminosity</option>
+                            <option value="edge">Edge Detection</option>
+                            <option value="noise">Noise Patches</option>
+                        </select>
+                    </div>
+
+                    <div class="control-row">
+                        <label>Threshold <span class="val" id="maskThresholdVal">128</span></label>
+                        <input type="range" id="maskThreshold" min="0" max="255" step="1" value="128">
+                    </div>
+
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="maskInvert">
+                        <label for="maskInvert">Invert Mask</label>
+                    </div>
+
+                    <div class="control-row">
+                        <label>Mask Blur <span class="val" id="maskBlurVal">0</span></label>
+                        <input type="range" id="maskBlur" min="0" max="20" step="1" value="0">
+                    </div>
+
+                    <div class="control-row">
+                        <label>Coverage <span class="val" id="coverageVal">50%</span></label>
+                        <input type="range" id="coverage" min="0" max="100" step="1" value="50">
+                    </div>
+
+                    <div class="control-row">
+                        <label>Mix <span class="val" id="mixVal">50%</span></label>
+                        <input type="range" id="mix" min="0" max="100" step="1" value="50">
+                    </div>
+                </div>
+            </details>
+
+            <!-- Animation -->
+            <details class="section" open>
+                <summary>Animation</summary>
+                <div class="section-body">
+                    <div class="checkbox-row">
+                        <input type="checkbox" id="animEnable" checked>
+                        <label for="animEnable">Enable Animation</label>
+                    </div>
+
+                    <div id="animVideoNote" class="help-hint" style="display:none;">
+                        Video sources have natural motion. Animation adds glyph drift and temporal variation on top. Duration synced to video length.
+                    </div>
+
+                    <div id="animControls">
+                        <div class="anim-transport">
+                            <button class="btn btn-small" id="animPlay">&#9654; Play</button>
+                            <button class="btn btn-small" id="animStop">&#9632; Stop</button>
+                        </div>
+
+                        <div class="control-row">
+                            <label>Speed <span class="val" id="animSpeedVal">0.1</span></label>
+                            <input type="range" id="animSpeed" min="0.1" max="3.0" step="0.1" value="0.1">
+                        </div>
+
+                        <div class="control-row">
+                            <label>Temporal Variation <span class="val" id="temporalVarVal">0%</span></label>
+                            <input type="range" id="temporalVar" min="0" max="100" step="1" value="0">
+                        </div>
+
+                        <div class="control-row">
+                            <label>Glyph Drift <span class="val" id="glyphDriftVal">0</span></label>
+                            <input type="range" id="glyphDrift" min="0" max="10" step="0.5" value="0">
+                        </div>
+
+                        <div class="control-row">
+                            <label>Frames <span class="val" id="frameCountVal">120</span></label>
+                            <input type="range" id="frameCount" min="30" max="600" step="10" value="120">
+                        </div>
+
+                        <div class="control-row">
+                            <label>FPS</label>
+                            <select id="animFps">
+                                <option value="24">24</option>
+                                <option value="30" selected>30</option>
+                                <option value="60">60</option>
+                            </select>
+                        </div>
+
+                        <div class="control-row">
+                            <label>Duration</label>
+                            <span class="val" id="animDuration">4.0s</span>
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <!-- Export -->
+            <details class="section" open>
+                <summary>Export</summary>
+                <div class="section-body">
+                    <div class="btn-row">
+                        <button class="btn btn-primary" id="exportPng" disabled>Export PNG</button>
+                    </div>
+                    <div id="animExportRow" style="margin-top: 6px;">
+                        <div class="btn-row">
+                            <button class="btn" id="exportMp4" disabled>MP4</button>
+                            <button class="btn" id="exportMov" disabled>MOV</button>
+                            <button class="btn" id="exportWebm" disabled>WebM</button>
+                        </div>
+                        <div class="btn-row" style="margin-top: 4px;">
+                            <button class="btn" id="exportPngSeq" disabled>PNG Seq</button>
+                            <button class="btn" id="exportJpgSeq" disabled>JPG Seq</button>
+                            <button class="btn" id="exportGif" disabled>GIF</button>
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <!-- Global -->
+            <details class="section" open>
+                <summary>Global</summary>
+                <div class="section-body">
+                    <div class="control-row">
+                        <label>Seed</label>
+                        <div class="input-row">
+                            <input type="number" id="seed" min="0" max="9999" value="42">
+                            <button class="btn btn-small" id="randomSeed">Rnd</button>
+                        </div>
+                    </div>
+
+                    <div class="control-row">
+                        <label>View Mode</label>
+                        <div class="view-modes">
+                            <button class="view-mode-btn active" data-view="processed">Result</button>
+                            <button class="view-mode-btn" data-view="original">Source</button>
+                            <button class="view-mode-btn" data-view="dither">Dither</button>
+                            <button class="view-mode-btn" data-view="glyphs">Glyphs</button>
+                            <button class="view-mode-btn" data-view="mask">Mask</button>
+                        </div>
+                        <div class="view-help" id="viewHelp">
+                            <code>Result</code> final composite &middot; <code>Source</code> original input &middot; <code>Dither</code> B&W dither pass &middot; <code>Glyphs</code> character grid only &middot; <code>Mask</code> blend mask
+                        </div>
+                    </div>
+
+                    <div class="btn-row" style="margin-top: 10px;">
+                        <button class="btn" id="resetBtn">Reset All</button>
+                    </div>
+
+                    <div class="help-hint">
+                        Grid Density controls detail level. Brightness and Gamma (Image Layer) affect the dither threshold. Use <code>Draft</code> preview for faster editing, <code>&frac12; rec</code> export scale for web.
+                    </div>
+                </div>
+            </details>
+        </div>
+
+        <footer class="site-footer">
+            <a href="https://kindl.work/" target="_blank" rel="noopener">kindl.work</a>
+        </footer>
+    </aside>
+
+    <!-- === Viewport === -->
+    <main class="viewport">
+        <div class="canvas-container" id="canvasContainer">
+            <div class="placeholder" id="placeholder">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+                </svg>
+                <p>Drop image or video to begin</p>
+            </div>
+            <canvas id="preview" style="display: none;"></canvas>
+            <div class="progress-overlay hidden" id="progressOverlay">
+                <div class="progress-text" id="progressText">Exporting...</div>
+                <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+            </div>
+        </div>
+        <div class="status-bar">
+            <span class="status-item" id="statusDims">&mdash;</span>
+            <span class="status-sep">&middot;</span>
+            <span class="status-item" id="statusGrid">&mdash;</span>
+            <span class="status-sep">&middot;</span>
+            <span class="status-item" id="statusMethod">&mdash;</span>
+            <span class="status-sep">&middot;</span>
+            <span class="status-item" id="statusTime">&mdash;</span>
+        </div>
+    </main>
+</div>
+
+<script>
+/* ===================================================================
+   GlyphGarden -- Processing Engine
+   =================================================================== */
+
+// -- State ---------------------------------------------------------
+
+const STATE = {
+    sourceImage: null,
+    sourceVideo: null,
+    sourceType: 'image',
+    sourceWidth: 0,
+    sourceHeight: 0,
+
+    aspectRatio: 'original',
+    exportScale: 1,
+    previewQuality: 'draft', // 'full' or 'draft'
+
+    glyph: {
+        charSet: 'ascii',
+        customChars: ' .:-=+*#%@',
+        gridCols: 100,
+        charColor: '#ffffff',
+        bgColor: '#000000',
+        bgOpacity: 1.0,
+        fontFamily: '',
+        decimalPrecision: 2,
+        randomize: 0,
+    },
+
+    image: {
+        preBlur: 0,
+        brightness: 1.0,
+        contrast: 1.5,
+        gamma: 1.0,
+        ditherMethod: 'floyd-steinberg',
+        ditherScale: 2,
+    },
+
+    mask: {
+        mode: 'luminosity',
+        threshold: 128,
+        invert: false,
+        blur: 0,
+        coverage: 50,
+        mix: 50,
+    },
+
+    animation: {
+        enabled: true,
+        speed: 0.1,
+        temporalVariation: 0,
+        glyphDrift: 0,
+        frameCount: 120,
+        fps: 30,
+    },
+
+    seed: 42,
+    viewMode: 'processed',
+};
+
+// -- Cached Buffers ------------------------------------------------
+
+let cachedGray = null;
+let cachedDithered = null;
+let cachedGlyphCanvas = null;
+let cachedMask = null;
+let previewW = 0, previewH = 0;
+
+// Offscreen canvases
+const srcCanvas = document.createElement('canvas');
+const srcCtx = srcCanvas.getContext('2d', { willReadFrequently: true });
+const glyphCanvas = document.createElement('canvas');
+const glyphCtx = glyphCanvas.getContext('2d');
+const compositeCanvas = document.createElement('canvas');
+const compositeCtx = compositeCanvas.getContext('2d');
+
+// -- Seeded RNG ----------------------------------------------------
+
+function mulberry32(seed) {
+    return function() {
+        seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+        let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+        t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+}
+
+// -- Value Noise ---------------------------------------------------
+
+function valueNoise2D(x, y, seed) {
+    function hash(ix, iy) {
+        let h = (seed | 0) + Math.imul(ix, 374761393) + Math.imul(iy, 668265263);
+        h = Math.imul(h ^ (h >>> 13), 1274126177);
+        return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+    }
+    const ix = Math.floor(x), iy = Math.floor(y);
+    const fx = x - ix, fy = y - iy;
+    const sx = fx * fx * (3 - 2 * fx);
+    const sy = fy * fy * (3 - 2 * fy);
+    const n00 = hash(ix, iy), n10 = hash(ix + 1, iy);
+    const n01 = hash(ix, iy + 1), n11 = hash(ix + 1, iy + 1);
+    return (n00 * (1 - sx) + n10 * sx) * (1 - sy) + (n01 * (1 - sx) + n11 * sx) * sy;
+}
+
+// -- Image Layer: Grayscale + Tonal --------------------------------
+
+function toGrayscale(srcData, width, height, brightness, contrast, gamma) {
+    const out = new Float32Array(width * height);
+    for (let i = 0; i < width * height; i++) {
+        const r = srcData[i * 4];
+        const g = srcData[i * 4 + 1];
+        const b = srcData[i * 4 + 2];
+        let lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        lum *= brightness;
+        lum = (lum - 128) * contrast + 128;
+        if (gamma !== 1.0) {
+            lum = 255 * Math.pow(Math.max(0, lum / 255), 1.0 / gamma);
+        }
+        out[i] = Math.max(0, Math.min(255, lum));
+    }
+    return out;
+}
+
+// -- Box Blur (3-pass approximation of Gaussian) -------------------
+
+function boxBlurSingle(data, width, height, radius) {
+    if (radius < 1) return data;
+    const r = Math.round(radius);
+    const out = new Float32Array(data.length);
+
+    // Horizontal pass
+    for (let y = 0; y < height; y++) {
+        let sum = 0;
+        const rowOff = y * width;
+        for (let x = 0; x < r && x < width; x++) sum += data[rowOff + x];
+        for (let x = 0; x < width; x++) {
+            const right = x + r;
+            if (right < width) sum += data[rowOff + right];
+            const left = x - r - 1;
+            if (left >= 0) sum -= data[rowOff + left];
+            const count = Math.min(right, width - 1) - Math.max(left + 1, 0) + 1;
+            out[rowOff + x] = sum / count;
+        }
+    }
+
+    // Vertical pass
+    const out2 = new Float32Array(data.length);
+    for (let x = 0; x < width; x++) {
+        let sum = 0;
+        for (let y = 0; y < r && y < height; y++) sum += out[y * width + x];
+        for (let y = 0; y < height; y++) {
+            const bottom = y + r;
+            if (bottom < height) sum += out[bottom * width + x];
+            const top = y - r - 1;
+            if (top >= 0) sum -= out[top * width + x];
+            const count = Math.min(bottom, height - 1) - Math.max(top + 1, 0) + 1;
+            out2[y * width + x] = sum / count;
+        }
+    }
+    return out2;
+}
+
+function gaussianBlur(data, width, height, radius) {
+    if (radius < 0.5) return data;
+    let result = data;
+    // 3 passes of box blur ~ Gaussian
+    const boxR = Math.max(1, Math.round(radius / 1.73));
+    result = boxBlurSingle(result, width, height, boxR);
+    result = boxBlurSingle(result, width, height, boxR);
+    result = boxBlurSingle(result, width, height, boxR);
+    return result;
+}
+
+// -- Dithering -----------------------------------------------------
+
+function ditherFloydSteinberg(gray, width, height) {
+    const out = new Uint8ClampedArray(width * height);
+    const err = new Float32Array(gray.length);
+    for (let i = 0; i < gray.length; i++) err[i] = gray[i];
+
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const i = y * width + x;
+            const old = err[i];
+            const val = old > 127 ? 255 : 0;
+            out[i] = val;
+            const e = old - val;
+            if (x + 1 < width)                   err[i + 1]         += e * 7 / 16;
+            if (y + 1 < height && x > 0)          err[i + width - 1] += e * 3 / 16;
+            if (y + 1 < height)                   err[i + width]     += e * 5 / 16;
+            if (y + 1 < height && x + 1 < width)  err[i + width + 1] += e * 1 / 16;
+        }
+    }
+    return out;
+}
+
+const BAYER8 = [
+    [ 0, 32,  8, 40,  2, 34, 10, 42],
+    [48, 16, 56, 24, 50, 18, 58, 26],
+    [12, 44,  4, 36, 14, 46,  6, 38],
+    [60, 28, 52, 20, 62, 30, 54, 22],
+    [ 3, 35, 11, 43,  1, 33,  9, 41],
+    [51, 19, 59, 27, 49, 17, 57, 25],
+    [15, 47,  7, 39, 13, 45,  5, 37],
+    [63, 31, 55, 23, 61, 29, 53, 21]
+];
+
+function ditherOrdered(gray, width, height, scale) {
+    const out = new Uint8ClampedArray(width * height);
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const i = y * width + x;
+            const bx = Math.floor(x / scale) % 8;
+            const by = Math.floor(y / scale) % 8;
+            const threshold = (BAYER8[by][bx] / 64) * 255;
+            out[i] = gray[i] > threshold ? 255 : 0;
+        }
+    }
+    return out;
+}
+
+function ditherHalftone(gray, width, height, dotSize) {
+    const out = new Uint8ClampedArray(width * height);
+    out.fill(255);
+    const cellSize = Math.max(2, dotSize * 2);
+
+    for (let cy = 0; cy < height; cy += cellSize) {
+        for (let cx = 0; cx < width; cx += cellSize) {
+            let sum = 0, count = 0;
+            for (let dy = 0; dy < cellSize && cy + dy < height; dy++) {
+                for (let dx = 0; dx < cellSize && cx + dx < width; dx++) {
+                    sum += gray[(cy + dy) * width + (cx + dx)];
+                    count++;
+                }
+            }
+            const avg = sum / count;
+            const radius = (1 - avg / 255) * (cellSize / 2);
+            const halfCell = cellSize / 2;
+
+            for (let dy = 0; dy < cellSize && cy + dy < height; dy++) {
+                for (let dx = 0; dx < cellSize && cx + dx < width; dx++) {
+                    const dist = Math.sqrt((dx - halfCell) * (dx - halfCell) + (dy - halfCell) * (dy - halfCell));
+                    if (dist <= radius) {
+                        out[(cy + dy) * width + (cx + dx)] = 0;
+                    }
+                }
+            }
+        }
+    }
+    return out;
+}
+
+function applyDither(gray, width, height) {
+    const { ditherMethod, ditherScale } = STATE.image;
+    switch (ditherMethod) {
+        case 'floyd-steinberg': return ditherFloydSteinberg(gray, width, height);
+        case 'ordered': return ditherOrdered(gray, width, height, ditherScale);
+        case 'halftone': return ditherHalftone(gray, width, height, ditherScale);
+        default: return ditherFloydSteinberg(gray, width, height);
+    }
+}
+
+// -- Glyph Layer ---------------------------------------------------
+
+function computeGrid(width, height, cols) {
+    const cellW = width / cols;
+    const charAspect = 0.6; // monospace char width/height
+    const cellH = cellW / charAspect;
+    const rows = Math.ceil(height / cellH);
+    return { cols, rows, cellW, cellH };
+}
+
+function computeCellLuminosity(gray, width, height, grid) {
+    const cells = new Float32Array(grid.cols * grid.rows);
+    for (let row = 0; row < grid.rows; row++) {
+        for (let col = 0; col < grid.cols; col++) {
+            const x0 = Math.floor(col * grid.cellW);
+            const y0 = Math.floor(row * grid.cellH);
+            const x1 = Math.min(Math.floor((col + 1) * grid.cellW), width);
+            const y1 = Math.min(Math.floor((row + 1) * grid.cellH), height);
+            let sum = 0, count = 0;
+            for (let y = y0; y < y1; y++) {
+                for (let x = x0; x < x1; x++) {
+                    sum += gray[y * width + x];
+                    count++;
+                }
+            }
+            cells[row * grid.cols + col] = count > 0 ? sum / count / 255 : 0;
+        }
+    }
+    return cells;
+}
+
+function getCharForLuminosity(lum, charSet, precision, rng, randomize) {
+    if (randomize > 0) {
+        lum = Math.max(0, Math.min(1, lum + (rng() - 0.5) * randomize * 0.01));
+    }
+    switch (charSet) {
+        case 'luminosity':
+            return lum.toFixed(precision);
+        case 'ascii': {
+            const ramp = ' .:-=+*#%@';
+            return ramp[Math.min(ramp.length - 1, Math.floor(lum * ramp.length))];
+        }
+        case 'blocks': {
+            const blocks = ' \u2591\u2592\u2593\u2588';
+            return blocks[Math.min(blocks.length - 1, Math.floor(lum * blocks.length))];
+        }
+        case 'custom': {
+            const chars = STATE.glyph.customChars || ' #';
+            return chars[Math.min(chars.length - 1, Math.floor(lum * chars.length))];
+        }
+        default:
+            return lum.toFixed(2);
+    }
+}
+
+function renderGlyphLayer(canvas, ctx, cells, grid, width, height, frameOffset) {
+    canvas.width = width;
+    canvas.height = height;
+    ctx.imageSmoothingEnabled = false;
+
+    const { charSet, charColor, bgColor, bgOpacity, fontFamily, decimalPrecision, randomize } = STATE.glyph;
+    const rng = mulberry32(STATE.seed + (frameOffset || 0));
+
+    // Determine the font to use
+    const defaultMono = getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim() || 'monospace';
+    const monoFont = fontFamily || defaultMono;
+    let fontSize;
+    if (charSet === 'luminosity') {
+        // Luminosity values: "0.83" = 4 chars. Need ~15% margin on each side.
+        const charCount = decimalPrecision + 2;
+        const fitsH = Math.floor(grid.cellH * 0.55);
+        const fitsW = Math.floor((grid.cellW * 0.85) / (charCount * 0.62));
+        fontSize = Math.min(fitsH, fitsW);
+    } else if (charSet === 'blocks') {
+        // Block elements fill the cell
+        fontSize = Math.floor(grid.cellH * 1.1);
+    } else {
+        fontSize = Math.floor(Math.min(grid.cellW * 0.9, grid.cellH * 0.7));
+    }
+    fontSize = Math.max(3, fontSize);
+
+    ctx.font = fontSize + 'px ' + monoFont;
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'center';
+
+    // Clear to transparent
+    ctx.clearRect(0, 0, width, height);
+
+    for (let row = 0; row < grid.rows; row++) {
+        for (let col = 0; col < grid.cols; col++) {
+            const x = Math.floor(col * grid.cellW);
+            const y = Math.floor(row * grid.cellH);
+            const w = Math.ceil(grid.cellW);
+            const h = Math.ceil(grid.cellH);
+            const lum = cells[row * grid.cols + col];
+
+            // Positional drift for animation
+            let dx = 0, dy = 0;
+            if (frameOffset && STATE.animation.glyphDrift > 0) {
+                const drift = STATE.animation.glyphDrift;
+                dx = (valueNoise2D(col * 0.2, (frameOffset / STATE.animation.fps) * 0.2, STATE.seed) - 0.5) * drift * 2;
+                dy = (valueNoise2D(row * 0.2, (frameOffset / STATE.animation.fps) * 0.15, STATE.seed + 1000) - 0.5) * drift * 2;
+            }
+
+            // Temporal variation for animation
+            let animLum = lum;
+            if (frameOffset && STATE.animation.temporalVariation > 0) {
+                const tv = STATE.animation.temporalVariation;
+                const noise = valueNoise2D(
+                    col * 0.1 + (frameOffset / STATE.animation.fps) * 0.5,
+                    row * 0.1 + (frameOffset / STATE.animation.fps) * 0.3,
+                    STATE.seed + frameOffset
+                );
+                animLum = Math.max(0, Math.min(1, lum + (noise - 0.5) * tv * 0.5));
+            }
+
+            // Cell background with real opacity
+            if (bgOpacity > 0) {
+                // Parse bgColor hex to RGB
+                var br = parseInt(bgColor.slice(1, 3), 16);
+                var bg = parseInt(bgColor.slice(3, 5), 16);
+                var bb = parseInt(bgColor.slice(5, 7), 16);
+                ctx.fillStyle = 'rgba(' + br + ', ' + bg + ', ' + bb + ', ' + bgOpacity + ')';
+                ctx.fillRect(x + dx, y + dy, w, h);
+            }
+
+            // Character -- clip to cell boundaries to prevent overflow
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(x + dx, y + dy, w, h);
+            ctx.clip();
+            const char = getCharForLuminosity(animLum, charSet, decimalPrecision, rng, randomize);
+            ctx.fillStyle = charColor;
+            ctx.fillText(char, x + w / 2 + dx, y + h / 2 + dy);
+            ctx.restore();
+        }
+    }
+}
+
+// -- Cell-Level Mask (operates on grid cells, not pixels) ----------
+
+function generateCellMask(gray, width, height, grid, frameOffset) {
+    const cellMask = new Float32Array(grid.cols * grid.rows);
+    const { mode, threshold, invert, coverage } = STATE.mask;
+
+    for (let row = 0; row < grid.rows; row++) {
+        for (let col = 0; col < grid.cols; col++) {
+            const x0 = Math.floor(col * grid.cellW);
+            const y0 = Math.floor(row * grid.cellH);
+            const x1 = Math.min(Math.floor((col + 1) * grid.cellW), width);
+            const y1 = Math.min(Math.floor((row + 1) * grid.cellH), height);
+
+            // Average luminosity in cell
+            let sum = 0, count = 0;
+            for (let y = y0; y < y1; y++) {
+                for (let x = x0; x < x1; x++) {
+                    sum += gray[y * width + x];
+                    count++;
+                }
+            }
+            const avgLum = count > 0 ? sum / count : 128;
+
+            switch (mode) {
+                case 'luminosity':
+                    cellMask[row * grid.cols + col] = avgLum < threshold ? 1.0 : 0.0;
+                    break;
+                case 'edge': {
+                    // Average edge magnitude in cell via central differences
+                    let edgeSum = 0, edgeCount = 0;
+                    for (let y = Math.max(1, y0); y < Math.min(y1, height - 1); y++) {
+                        for (let x = Math.max(1, x0); x < Math.min(x1, width - 1); x++) {
+                            const gx = gray[y * width + x + 1] - gray[y * width + x - 1];
+                            const gy = gray[(y + 1) * width + x] - gray[(y - 1) * width + x];
+                            edgeSum += Math.sqrt(gx * gx + gy * gy);
+                            edgeCount++;
+                        }
+                    }
+                    const avgEdge = edgeCount > 0 ? edgeSum / edgeCount : 0;
+                    cellMask[row * grid.cols + col] = avgEdge > threshold ? 1.0 : 0.0;
+                    break;
+                }
+                case 'noise': {
+                    // Use frameOffset to animate noise coordinates
+                    const timeShift = (frameOffset || 0) * 0.005;
+                    const scale = 0.05 + (1 - coverage / 100) * 0.15;
+                    const n = valueNoise2D(col * scale + timeShift * 0.7, row * scale + timeShift * 0.5, STATE.seed);
+                    cellMask[row * grid.cols + col] = n > (1 - coverage / 100) ? 1.0 : 0.0;
+                    break;
+                }
+            }
+        }
+    }
+
+    if (invert) {
+        for (let i = 0; i < cellMask.length; i++) cellMask[i] = 1.0 - cellMask[i];
+    }
+
+    return cellMask;
+}
+
+// -- Compositing ---------------------------------------------------
+// Mix slider logic:
+//   mix=100 => all glyphs (every cell shows glyphs regardless of mask)
+//   mix=0   => all dither (every cell shows dithered image regardless of mask)
+//   mix=50  => mask determines which cells show what
+
+function composite(outCanvas, outCtx, dithered, glyphCanvasSrc, cellMask, grid, width, height) {
+    outCanvas.width = width;
+    outCanvas.height = height;
+    outCtx.imageSmoothingEnabled = false;
+
+    const imageData = outCtx.createImageData(width, height);
+    const d = imageData.data;
+    const mixVal = STATE.mask.mix / 100; // 0..1
+
+    // Get glyph pixel data
+    const glyphData = glyphCanvasSrc.getContext('2d', { willReadFrequently: true })
+        .getImageData(0, 0, width, height).data;
+
+    for (let py = 0; py < height; py++) {
+        const row = Math.min(Math.floor(py / grid.cellH), grid.rows - 1);
+
+        for (let px = 0; px < width; px++) {
+            const i = py * width + px;
+            const di = i * 4;
+
+            const col = Math.min(Math.floor(px / grid.cellW), grid.cols - 1);
+
+            // Cell mask value (0..1 from generateCellMask)
+            const rawMask = cellMask[row * grid.cols + col];
+
+            // Compute blend factor based on mix slider:
+            // mix=1.0 => glyphBlend=1.0 always (all glyphs)
+            // mix=0.0 => glyphBlend=0.0 always (all dither)
+            // mix=0.5 => glyphBlend=rawMask (mask decides)
+            let glyphBlend;
+            if (mixVal >= 0.5) {
+                // Blend from mask-controlled to all-glyphs
+                const t = (mixVal - 0.5) * 2; // 0..1
+                glyphBlend = rawMask * (1 - t) + t;
+            } else {
+                // Blend from all-dither to mask-controlled
+                const t = mixVal * 2; // 0..1
+                glyphBlend = rawMask * t;
+            }
+
+            // Dithered layer
+            const dv = dithered[i];
+
+            // Glyph layer pixel
+            const gr = glyphData[di];
+            const gg = glyphData[di + 1];
+            const gb = glyphData[di + 2];
+            const ga = glyphData[di + 3] / 255;
+
+            if (glyphBlend > 0.5 && ga > 0) {
+                d[di]     = gr;
+                d[di + 1] = gg;
+                d[di + 2] = gb;
+                d[di + 3] = 255;
+            } else {
+                d[di]     = dv;
+                d[di + 1] = dv;
+                d[di + 2] = dv;
+                d[di + 3] = 255;
+            }
+        }
+    }
+
+    outCtx.putImageData(imageData, 0, 0);
+}
+
+// -- Render Pipeline -----------------------------------------------
+
+function getOutputDimensions() {
+    if (!STATE.sourceWidth) return { w: 0, h: 0 };
+    let w = STATE.sourceWidth, h = STATE.sourceHeight;
+
+    // Apply aspect ratio
+    if (STATE.aspectRatio !== 'original') {
+        const parts = STATE.aspectRatio.split(':').map(Number);
+        const targetRatio = parts[0] / parts[1];
+        const srcRatio = w / h;
+        if (srcRatio > targetRatio) {
+            w = Math.round(h * targetRatio);
+        } else {
+            h = Math.round(w / targetRatio);
+        }
+    }
+    return { w, h };
+}
+
+function getPreviewDimensions() {
+    const { w, h } = getOutputDimensions();
+    if (!w || !h) return { w: 0, h: 0 };
+
+    // Full quality: render at export dimensions (source × scale)
+    if (STATE.previewQuality === 'full') {
+        const s = STATE.exportScale;
+        return { w: Math.round(w * s), h: Math.round(h * s) };
+    }
+
+    // Draft: cap at 800px
+    const maxDim = 800;
+    const ratio = w / h;
+    if (w >= h) {
+        return { w: Math.min(w, maxDim), h: Math.min(w, maxDim) / ratio | 0 };
+    }
+    return { w: (Math.min(h, maxDim) * ratio) | 0, h: Math.min(h, maxDim) };
+}
+
+function drawSourceToCanvas(targetCanvas, targetCtx, w, h) {
+    targetCanvas.width = w;
+    targetCanvas.height = h;
+    targetCtx.imageSmoothingEnabled = false;
+
+    const source = STATE.sourceType === 'video' ? STATE.sourceVideo : STATE.sourceImage;
+    const { w: outW, h: outH } = getOutputDimensions();
+    const srcRatio = STATE.sourceWidth / STATE.sourceHeight;
+    const dstRatio = outW / outH;
+    let sx = 0, sy = 0, sw = STATE.sourceWidth, sh = STATE.sourceHeight;
+    if (srcRatio > dstRatio) {
+        sw = Math.round(STATE.sourceHeight * dstRatio);
+        sx = Math.round((STATE.sourceWidth - sw) / 2);
+    } else {
+        sh = Math.round(STATE.sourceWidth / dstRatio);
+        sy = Math.round((STATE.sourceHeight - sh) / 2);
+    }
+    targetCtx.drawImage(source, sx, sy, sw, sh, 0, 0, w, h);
+}
+
+function render(frameOffset) {
+    if (!STATE.sourceImage && !STATE.sourceVideo) return;
+
+    const t0 = performance.now();
+    const { w, h } = getPreviewDimensions();
+    if (!w || !h) return;
+
+    previewW = w;
+    previewH = h;
+
+    // Draw source to srcCanvas
+    drawSourceToCanvas(srcCanvas, srcCtx, w, h);
+
+    // View mode: original
+    if (STATE.viewMode === 'original') {
+        const preview = document.getElementById('preview');
+        preview.width = w;
+        preview.height = h;
+        const pCtx = preview.getContext('2d');
+        pCtx.imageSmoothingEnabled = false;
+        pCtx.drawImage(srcCanvas, 0, 0);
+        checkPerformance(performance.now() - t0);
+        updateStatus(w, h, performance.now() - t0);
+        return;
+    }
+
+    // Get source pixel data
+    const srcData = srcCtx.getImageData(0, 0, w, h).data;
+
+    // Grayscale + tonal
+    cachedGray = toGrayscale(srcData, w, h, STATE.image.brightness, STATE.image.contrast, STATE.image.gamma);
+
+    // Pre-blur
+    if (STATE.image.preBlur > 0) {
+        cachedGray = gaussianBlur(cachedGray, w, h, STATE.image.preBlur * (w / 800));
+    }
+
+    // Dithering
+    cachedDithered = applyDither(cachedGray, w, h);
+
+    // View mode: dither only
+    if (STATE.viewMode === 'dither') {
+        displaySingleChannel(cachedDithered, w, h);
+        checkPerformance(performance.now() - t0);
+        updateStatus(w, h, performance.now() - t0);
+        return;
+    }
+
+    // Glyph layer
+    const grid = computeGrid(w, h, STATE.glyph.gridCols);
+    const cells = computeCellLuminosity(cachedGray, w, h, grid);
+    renderGlyphLayer(glyphCanvas, glyphCtx, cells, grid, w, h, frameOffset || 0);
+
+    // View mode: glyphs only
+    if (STATE.viewMode === 'glyphs') {
+        const preview = document.getElementById('preview');
+        preview.width = w;
+        preview.height = h;
+        const pCtx = preview.getContext('2d');
+        pCtx.imageSmoothingEnabled = false;
+        pCtx.fillStyle = '#000';
+        pCtx.fillRect(0, 0, w, h);
+        pCtx.drawImage(glyphCanvas, 0, 0);
+        checkPerformance(performance.now() - t0);
+        updateStatus(w, h, performance.now() - t0);
+        return;
+    }
+
+    // Cell-level mask
+    cachedMask = generateCellMask(cachedGray, w, h, grid, frameOffset || 0);
+
+    // View mode: mask (display as cell blocks for visualization)
+    if (STATE.viewMode === 'mask') {
+        displayCellMask(cachedMask, grid, w, h);
+        checkPerformance(performance.now() - t0);
+        updateStatus(w, h, performance.now() - t0);
+        return;
+    }
+
+    // Composite
+    composite(compositeCanvas, compositeCtx, cachedDithered, glyphCanvas, cachedMask, grid, w, h);
+
+    // Display
+    const preview = document.getElementById('preview');
+    preview.width = w;
+    preview.height = h;
+    const pCtx = preview.getContext('2d');
+    pCtx.imageSmoothingEnabled = false;
+    pCtx.drawImage(compositeCanvas, 0, 0);
+
+    checkPerformance(performance.now() - t0);
+    updateStatus(w, h, performance.now() - t0);
+}
+
+// Auto-switch to draft if render time is too slow
+let performanceChecked = false;
+function checkPerformance(timeMs) {
+    if (performanceChecked) return;
+    if (STATE.previewQuality === 'full' && timeMs > 200) {
+        // Auto-switch to draft for performance
+        STATE.previewQuality = 'draft';
+        document.getElementById('previewQuality').value = 'draft';
+        performanceChecked = true;
+        scheduleRender();
+    }
+}
+
+function displaySingleChannel(data, w, h) {
+    const preview = document.getElementById('preview');
+    preview.width = w;
+    preview.height = h;
+    const ctx = preview.getContext('2d');
+    const imageData = ctx.createImageData(w, h);
+    for (let i = 0; i < w * h; i++) {
+        const v = data[i];
+        imageData.data[i * 4] = v;
+        imageData.data[i * 4 + 1] = v;
+        imageData.data[i * 4 + 2] = v;
+        imageData.data[i * 4 + 3] = 255;
+    }
+    ctx.putImageData(imageData, 0, 0);
+}
+
+function displayCellMask(cellMask, grid, w, h) {
+    const preview = document.getElementById('preview');
+    preview.width = w;
+    preview.height = h;
+    const ctx = preview.getContext('2d');
+    const imageData = ctx.createImageData(w, h);
+    const mixVal = STATE.mask.mix / 100;
+    for (let py = 0; py < h; py++) {
+        const row = Math.min(Math.floor(py / grid.cellH), grid.rows - 1);
+        for (let px = 0; px < w; px++) {
+            const col = Math.min(Math.floor(px / grid.cellW), grid.cols - 1);
+            const rawMask = cellMask[row * grid.cols + col];
+            let displayVal;
+            if (mixVal >= 0.5) {
+                const t = (mixVal - 0.5) * 2;
+                displayVal = rawMask * (1 - t) + t;
+            } else {
+                const t = mixVal * 2;
+                displayVal = rawMask * t;
+            }
+            const v = Math.round(displayVal * 255);
+            const di = (py * w + px) * 4;
+            imageData.data[di] = v;
+            imageData.data[di + 1] = v;
+            imageData.data[di + 2] = v;
+            imageData.data[di + 3] = 255;
+        }
+    }
+    ctx.putImageData(imageData, 0, 0);
+}
+
+function updateStatus(w, h, timeMs) {
+    const grid = computeGrid(w, h, STATE.glyph.gridCols);
+    document.getElementById('statusDims').textContent = w + '\u00d7' + h;
+    document.getElementById('statusGrid').textContent = grid.cols + '\u00d7' + grid.rows + ' grid';
+    document.getElementById('statusMethod').textContent = STATE.image.ditherMethod;
+    document.getElementById('statusTime').textContent = timeMs.toFixed(0) + 'ms';
+}
+
+// -- Debounced Rendering -------------------------------------------
+
+let renderTimeout = null;
+function scheduleRender() {
+    if (renderTimeout) clearTimeout(renderTimeout);
+    renderTimeout = setTimeout(function() { render(); }, 100);
+}
+
+// -- File Loading --------------------------------------------------
+
+function loadFile(file) {
+    const url = URL.createObjectURL(file);
+    const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
+
+    if (file.type.startsWith('video/')) {
+        STATE.sourceType = 'video';
+        const video = document.createElement('video');
+        video.preload = 'auto';
+        video.src = url;
+        video.muted = true;
+        video.loop = true;
+        video.playsInline = true;
+
+        // Wait for video to be fully seekable
+        let loaded = false;
+        function onReady() {
+            if (loaded) return;
+            loaded = true;
+            STATE.sourceVideo = video;
+            STATE.sourceImage = null;
+            STATE.sourceWidth = video.videoWidth;
+            STATE.sourceHeight = video.videoHeight;
+
+            // Show video info
+            var infoBadge = document.getElementById('videoInfoBadge');
+            infoBadge.style.display = 'inline-block';
+            infoBadge.textContent = video.videoWidth + '\u00d7' + video.videoHeight + ' \u00b7 ' + video.duration.toFixed(1) + 's \u00b7 ' + fileSizeMB + ' MB';
+
+            // Sync animation duration to video length
+            var videoDur = video.duration;
+            var fps = STATE.animation.fps;
+            if (videoDur > 0 && videoDur <= 30) {
+                // Short video: sync frame count to video duration
+                var frames = Math.round(videoDur * fps);
+                frames = Math.max(30, Math.min(600, frames));
+                STATE.animation.frameCount = frames;
+                document.getElementById('frameCount').value = frames;
+                document.getElementById('frameCountVal').textContent = frames;
+                updateAnimDuration();
+            }
+            // Long video (>30s): keep current duration setting, export a snippet
+
+            // Disable animation by default for video (natural motion)
+            // But keep video export buttons visible (export uses video frames)
+            STATE.animation.enabled = false;
+            document.getElementById('animEnable').checked = false;
+            document.getElementById('animControls').classList.add('hidden');
+            document.getElementById('animExportRow').style.display = 'block';
+            document.getElementById('animVideoNote').style.display = 'block';
+
+            // Seek to time 0 and wait for seeked event before drawing first frame
+            video.currentTime = 0;
+            video.addEventListener('seeked', function onSeeked() {
+                video.removeEventListener('seeked', onSeeked);
+                document.getElementById('videoControlsRow').style.display = 'flex';
+                onSourceLoaded();
+            }, { once: true });
+        }
+
+        video.addEventListener('loadeddata', onReady);
+        video.addEventListener('canplay', onReady);
+        video.load();
+    } else {
+        STATE.sourceType = 'image';
+        const img = new Image();
+        img.onload = function() {
+            STATE.sourceImage = img;
+            STATE.sourceVideo = null;
+            STATE.sourceWidth = img.naturalWidth;
+            STATE.sourceHeight = img.naturalHeight;
+
+            // Show image info
+            var infoBadge = document.getElementById('videoInfoBadge');
+            infoBadge.style.display = 'inline-block';
+            infoBadge.textContent = img.naturalWidth + '\u00d7' + img.naturalHeight + ' \u00b7 ' + fileSizeMB + ' MB';
+
+            // Enable animation for images
+            STATE.animation.enabled = true;
+            document.getElementById('animEnable').checked = true;
+            document.getElementById('animControls').classList.remove('hidden');
+            document.getElementById('animExportRow').style.display = 'block';
+            document.getElementById('animVideoNote').style.display = 'none';
+
+            document.getElementById('videoControlsRow').style.display = 'none';
+            onSourceLoaded();
+        };
+        img.src = url;
+    }
+}
+
+function onSourceLoaded() {
+    document.getElementById('placeholder').style.display = 'none';
+    document.getElementById('preview').style.display = 'block';
+    document.getElementById('exportPng').disabled = false;
+    document.getElementById('exportWebm').disabled = false;
+    document.getElementById('exportMp4').disabled = false;
+    document.getElementById('exportMov').disabled = false;
+    document.getElementById('exportGif').disabled = false;
+    document.getElementById('exportPngSeq').disabled = false;
+    document.getElementById('exportJpgSeq').disabled = false;
+    performanceChecked = false;
+    updateOutputDims();
+    render();
+}
+
+function updateOutputDims() {
+    const { w, h } = getOutputDimensions();
+    const s = STATE.exportScale;
+    document.getElementById('outputDims').textContent = w ? (Math.round(w * s) + '\u00d7' + Math.round(h * s)) : '\u2014';
+}
+
+function updateAnimDuration() {
+    const dur = STATE.animation.frameCount / STATE.animation.fps;
+    document.getElementById('animDuration').textContent = dur.toFixed(1) + 's';
+}
+
+// -- Animation System ----------------------------------------------
+
+let animRunning = false;
+let animFrameId = null;
+let animFrame = 0;
+let animStartTime = 0;
+
+function startAnimation() {
+    if (!STATE.sourceImage && !STATE.sourceVideo) return;
+    animRunning = true;
+    animFrame = 0;
+    animStartTime = performance.now();
+    document.getElementById('animPlay').innerHTML = '&#9646;&#9646; Pause';
+    animationLoop();
+}
+
+function stopAnimation() {
+    animRunning = false;
+    if (animFrameId) cancelAnimationFrame(animFrameId);
+    animFrameId = null;
+    document.getElementById('animPlay').innerHTML = '&#9654; Play';
+    render(); // Render static frame
+}
+
+function animationLoop() {
+    if (!animRunning) return;
+
+    const elapsed = (performance.now() - animStartTime) / 1000;
+    const fps = STATE.animation.fps;
+    const speed = STATE.animation.speed;
+    const targetFrame = Math.floor(elapsed * fps * speed) % STATE.animation.frameCount;
+
+    if (targetFrame !== animFrame) {
+        animFrame = targetFrame;
+
+        // For video source: draw current video frame on each render
+        if (STATE.sourceType === 'video' && STATE.sourceVideo) {
+            // Video plays in sync; we just draw whatever frame it is on
+        }
+
+        render(animFrame);
+    }
+
+    animFrameId = requestAnimationFrame(animationLoop);
+}
+
+// -- Export Helpers: render a single frame for given viewMode ------
+
+function renderExportFrame(outCanvas, w, h, frameOffset, viewMode) {
+    const outCtx = outCanvas.getContext('2d', { willReadFrequently: true });
+    outCanvas.width = w;
+    outCanvas.height = h;
+    outCtx.imageSmoothingEnabled = false;
+
+    // Draw source
+    const tmpSrc = document.createElement('canvas');
+    tmpSrc.width = w; tmpSrc.height = h;
+    const tmpSrcCtx = tmpSrc.getContext('2d', { willReadFrequently: true });
+    tmpSrcCtx.imageSmoothingEnabled = false;
+
+    const source = STATE.sourceType === 'video' ? STATE.sourceVideo : STATE.sourceImage;
+    const { w: baseW, h: baseH } = getOutputDimensions();
+    const srcRatio = STATE.sourceWidth / STATE.sourceHeight;
+    const dstRatio = baseW / baseH;
+    let sx = 0, sy = 0, sw = STATE.sourceWidth, sh = STATE.sourceHeight;
+    if (srcRatio > dstRatio) {
+        sw = Math.round(STATE.sourceHeight * dstRatio);
+        sx = Math.round((STATE.sourceWidth - sw) / 2);
+    } else {
+        sh = Math.round(STATE.sourceWidth / dstRatio);
+        sy = Math.round((STATE.sourceHeight - sh) / 2);
+    }
+    tmpSrcCtx.drawImage(source, sx, sy, sw, sh, 0, 0, w, h);
+
+    // View mode: original
+    if (viewMode === 'original') {
+        outCtx.drawImage(tmpSrc, 0, 0);
+        return;
+    }
+
+    const srcData = tmpSrcCtx.getImageData(0, 0, w, h).data;
+
+    // Grayscale + tonal
+    let gray = toGrayscale(srcData, w, h, STATE.image.brightness, STATE.image.contrast, STATE.image.gamma);
+    if (STATE.image.preBlur > 0) {
+        gray = gaussianBlur(gray, w, h, STATE.image.preBlur * (w / 800));
+    }
+    const dithered = applyDither(gray, w, h);
+
+    // View mode: dither
+    if (viewMode === 'dither') {
+        const imageData = outCtx.createImageData(w, h);
+        for (let i = 0; i < w * h; i++) {
+            const v = dithered[i];
+            imageData.data[i * 4] = v;
+            imageData.data[i * 4 + 1] = v;
+            imageData.data[i * 4 + 2] = v;
+            imageData.data[i * 4 + 3] = 255;
+        }
+        outCtx.putImageData(imageData, 0, 0);
+        return;
+    }
+
+    // Glyph layer
+    const grid = computeGrid(w, h, STATE.glyph.gridCols);
+    const cells = computeCellLuminosity(gray, w, h, grid);
+    const frameGlyph = document.createElement('canvas');
+    const frameGlyphCtx = frameGlyph.getContext('2d');
+    renderGlyphLayer(frameGlyph, frameGlyphCtx, cells, grid, w, h, frameOffset);
+
+    // View mode: glyphs
+    if (viewMode === 'glyphs') {
+        outCtx.fillStyle = '#000';
+        outCtx.fillRect(0, 0, w, h);
+        outCtx.drawImage(frameGlyph, 0, 0);
+        return;
+    }
+
+    // Cell-level mask
+    const cellMask = generateCellMask(gray, w, h, grid, frameOffset);
+
+    // View mode: mask
+    if (viewMode === 'mask') {
+        const imageData = outCtx.createImageData(w, h);
+        const mixVal = STATE.mask.mix / 100;
+        for (let py = 0; py < h; py++) {
+            const row = Math.min(Math.floor(py / grid.cellH), grid.rows - 1);
+            for (let px = 0; px < w; px++) {
+                const col = Math.min(Math.floor(px / grid.cellW), grid.cols - 1);
+                const rawMask = cellMask[row * grid.cols + col];
+                let displayVal;
+                if (mixVal >= 0.5) {
+                    const t = (mixVal - 0.5) * 2;
+                    displayVal = rawMask * (1 - t) + t;
+                } else {
+                    const t = mixVal * 2;
+                    displayVal = rawMask * t;
+                }
+                const v = Math.round(displayVal * 255);
+                const di = (py * w + px) * 4;
+                imageData.data[di] = v;
+                imageData.data[di + 1] = v;
+                imageData.data[di + 2] = v;
+                imageData.data[di + 3] = 255;
+            }
+        }
+        outCtx.putImageData(imageData, 0, 0);
+        return;
+    }
+
+    // Default: composite (processed)
+    composite(outCanvas, outCtx, dithered, frameGlyph, cellMask, grid, w, h);
+}
+
+// -- Export: PNG ----------------------------------------------------
+
+async function exportPNG() {
+    const { w: baseW, h: baseH } = getOutputDimensions();
+    const scale = STATE.exportScale;
+    const w = Math.round(baseW * scale);
+    const h = Math.round(baseH * scale);
+
+    showProgress('Exporting PNG...');
+    await new Promise(function(r) { setTimeout(r, 50); });
+
+    const outCanvas = document.createElement('canvas');
+    renderExportFrame(outCanvas, w, h, 0, STATE.viewMode);
+
+    updateProgress(0.95);
+    await new Promise(function(r) { setTimeout(r, 10); });
+
+    outCanvas.toBlob(function(blob) {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'glyphgarden_' + Date.now() + '.png';
+        a.click();
+        URL.revokeObjectURL(url);
+        hideProgress();
+    }, 'image/png');
+}
+
+// -- Export: WebM (MediaRecorder, works well for WebM) -------------
+
+async function exportWebM() {
+    await exportVideoMediaRecorder('webm');
+}
+
+// -- Export: MP4 (WebCodecs + proper muxer) -------------------------
+
+async function exportMP4() {
+    await exportVideoWebCodecs('mp4');
+}
+
+// -- Export: MOV (WebCodecs + QuickTime container) ------------------
+
+async function exportMOV() {
+    await exportVideoWebCodecs('mov');
+}
+
+// -- Export: PNG / JPG Image Sequence (ZIP) -------------------------
+
+async function exportImageSequence(imageFormat) {
+    var ext = imageFormat === 'jpeg' ? 'jpg' : 'png';
+    var mimeType = 'image/' + imageFormat;
+    var quality = imageFormat === 'jpeg' ? 0.95 : undefined;
+
+    var dims = getOutputDimensions();
+    var scale = STATE.exportScale;
+    var w = Math.round(dims.w * scale);
+    var h = Math.round(dims.h * scale);
+    var fps = STATE.animation.fps;
+    var isVideo = STATE.sourceType === 'video' && STATE.sourceVideo;
+    var videoDuration = isVideo ? STATE.sourceVideo.duration : 0;
+    var videoStartTime = isVideo ? STATE.sourceVideo.currentTime : 0;
+    // For video sources: always export as sequence (use video duration if short, else use frameCount)
+    var totalFrames;
+    if (isVideo && !STATE.animation.enabled) {
+        totalFrames = (videoDuration > 0 && videoDuration <= 30) ? Math.round(videoDuration * fps) : STATE.animation.frameCount;
+    } else {
+        totalFrames = STATE.animation.enabled ? STATE.animation.frameCount : 1;
+    }
+
+    var wasAnimRunning = animRunning;
+    if (wasAnimRunning) stopAnimation();
+    if (isVideo && !STATE.sourceVideo.paused) STATE.sourceVideo.pause();
+    stopVideoRenderLoop();
+
+    var padLen = Math.max(5, String(totalFrames).length);
+    showProgress('Exporting ' + ext.toUpperCase() + ' Sequence (0/' + totalFrames + ')...');
+
+    var files = [];
+    var tmpCanvas = document.createElement('canvas');
+    var viewMode = STATE.viewMode;
+
+    for (var frame = 0; frame < totalFrames; frame++) {
+        if (isVideo) {
+            var targetTime = (videoStartTime + frame / fps) % videoDuration;
+            await new Promise(function(resolve) {
+                STATE.sourceVideo.currentTime = targetTime;
+                STATE.sourceVideo.addEventListener('seeked', resolve, { once: true });
+            });
+        }
+
+        renderExportFrame(tmpCanvas, w, h, frame, viewMode);
+
+        var blob = await new Promise(function(resolve) {
+            tmpCanvas.toBlob(resolve, mimeType, quality);
+        });
+        var data = new Uint8Array(await blob.arrayBuffer());
+
+        var frameNum = String(frame + 1).padStart(padLen, '0');
+        files.push({ name: 'glyphgarden_' + frameNum + '.' + ext, data: data });
+
+        updateProgress(frame / totalFrames * 0.85);
+        document.getElementById('progressText').textContent =
+            'Exporting ' + ext.toUpperCase() + ' (' + (frame + 1) + '/' + totalFrames + ')...';
+
+        if (frame % 2 === 0) await new Promise(function(r) { requestAnimationFrame(r); });
+    }
+
+    document.getElementById('progressText').textContent = 'Creating ZIP...';
+    updateProgress(0.9);
+    await new Promise(function(r) { setTimeout(r, 50); });
+
+    var zipData = createZipFile(files);
+    var zipBlob = new Blob([zipData], { type: 'application/zip' });
+    var url = URL.createObjectURL(zipBlob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'glyphgarden_' + ext + '_seq_' + Date.now() + '.zip';
+    a.click();
+    URL.revokeObjectURL(url);
+    hideProgress();
+
+    if (isVideo) STATE.sourceVideo.currentTime = videoStartTime;
+}
+
+// -- Minimal ZIP Encoder (no external deps) -------------------------
+
+var _crc32Table = null;
+function crc32(data) {
+    if (!_crc32Table) {
+        _crc32Table = new Uint32Array(256);
+        for (var i = 0; i < 256; i++) {
+            var c = i;
+            for (var j = 0; j < 8; j++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+            _crc32Table[i] = c;
+        }
+    }
+    var crc = 0xFFFFFFFF;
+    for (var i = 0; i < data.length; i++) {
+        crc = _crc32Table[(crc ^ data[i]) & 0xFF] ^ (crc >>> 8);
+    }
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+function createZipFile(files) {
+    var parts = [];
+    var centralParts = [];
+    var offset = 0;
+
+    for (var f = 0; f < files.length; f++) {
+        var file = files[f];
+        var nameBytes = new TextEncoder().encode(file.name);
+        var fileCrc = crc32(file.data);
+        var size = file.data.byteLength;
+
+        var lh = new Uint8Array(30 + nameBytes.length);
+        var lv = new DataView(lh.buffer);
+        lv.setUint32(0, 0x04034b50, true);
+        lv.setUint16(4, 20, true);
+        lv.setUint16(8, 0, true);
+        lv.setUint32(14, fileCrc, true);
+        lv.setUint32(18, size, true);
+        lv.setUint32(22, size, true);
+        lv.setUint16(26, nameBytes.length, true);
+        lh.set(nameBytes, 30);
+
+        var ch = new Uint8Array(46 + nameBytes.length);
+        var cv = new DataView(ch.buffer);
+        cv.setUint32(0, 0x02014b50, true);
+        cv.setUint16(4, 20, true);
+        cv.setUint16(6, 20, true);
+        cv.setUint16(10, 0, true);
+        cv.setUint32(16, fileCrc, true);
+        cv.setUint32(20, size, true);
+        cv.setUint32(24, size, true);
+        cv.setUint16(28, nameBytes.length, true);
+        cv.setUint32(42, offset, true);
+        ch.set(nameBytes, 46);
+
+        parts.push(lh, file.data);
+        centralParts.push(ch);
+        offset += lh.length + size;
+    }
+
+    var cdOffset = offset;
+    var cdSize = 0;
+    for (var i = 0; i < centralParts.length; i++) {
+        parts.push(centralParts[i]);
+        cdSize += centralParts[i].length;
+    }
+
+    var eocd = new Uint8Array(22);
+    var ev = new DataView(eocd.buffer);
+    ev.setUint32(0, 0x06054b50, true);
+    ev.setUint16(8, files.length, true);
+    ev.setUint16(10, files.length, true);
+    ev.setUint32(12, cdSize, true);
+    ev.setUint32(16, cdOffset, true);
+    parts.push(eocd);
+
+    var total = 0;
+    for (var i = 0; i < parts.length; i++) total += parts[i].byteLength;
+    var result = new Uint8Array(total);
+    var pos = 0;
+    for (var i = 0; i < parts.length; i++) {
+        result.set(parts[i] instanceof Uint8Array ? parts[i] : new Uint8Array(parts[i]), pos);
+        pos += parts[i].byteLength;
+    }
+    return result;
+}
+
+// -- Minimal MP4/MOV Muxer (H.264 / AVC in ISO BMFF) ---------------
+
+function mp4Box(type) {
+    var payloads = [];
+    var contentSize = 0;
+    for (var i = 1; i < arguments.length; i++) {
+        payloads.push(arguments[i]);
+        contentSize += arguments[i].byteLength;
+    }
+    var buf = new Uint8Array(8 + contentSize);
+    var view = new DataView(buf.buffer);
+    view.setUint32(0, 8 + contentSize);
+    buf[4] = type.charCodeAt(0);
+    buf[5] = type.charCodeAt(1);
+    buf[6] = type.charCodeAt(2);
+    buf[7] = type.charCodeAt(3);
+    var off = 8;
+    for (var i = 0; i < payloads.length; i++) {
+        buf.set(payloads[i], off);
+        off += payloads[i].byteLength;
+    }
+    return buf;
+}
+
+function mp4U32(v) { var b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, v); return b; }
+function mp4U16(v) { var b = new Uint8Array(2); new DataView(b.buffer).setUint16(0, v); return b; }
+function mp4S4(s) { return new Uint8Array([s.charCodeAt(0), s.charCodeAt(1), s.charCodeAt(2), s.charCodeAt(3)]); }
+function mp4Zeros(n) { return new Uint8Array(n); }
+function mp4Cat() {
+    var total = 0;
+    for (var i = 0; i < arguments.length; i++) total += arguments[i].byteLength;
+    var r = new Uint8Array(total);
+    var o = 0;
+    for (var i = 0; i < arguments.length; i++) { r.set(arguments[i], o); o += arguments[i].byteLength; }
+    return r;
+}
+
+function muxToMP4(encodedSamples, avcCData, width, height, fps, isMov) {
+    var totalSamples = encodedSamples.length;
+    var timescale = fps;
+    var sampleDuration = 1;
+    var trackDuration = totalSamples;
+    var movieTimescale = 1000;
+    var movieDuration = Math.round(totalSamples * movieTimescale / fps);
+
+    var mdatContentSize = 0;
+    var sampleSizes = [];
+    var keyFrames = [];
+    for (var i = 0; i < totalSamples; i++) {
+        var sz = encodedSamples[i].data.byteLength;
+        sampleSizes.push(sz);
+        mdatContentSize += sz;
+        if (encodedSamples[i].isKey) keyFrames.push(i + 1);
+    }
+
+    // ftyp
+    var ftyp;
+    if (isMov) {
+        ftyp = mp4Box('ftyp', mp4S4('qt  '), mp4U32(0x20070900), mp4S4('qt  '));
+    } else {
+        ftyp = mp4Box('ftyp', mp4S4('isom'), mp4U32(0x200), mp4S4('isom'), mp4S4('iso2'), mp4S4('avc1'), mp4S4('mp41'));
+    }
+
+    var mdatHeaderSize = 8;
+    var chunkOffset = ftyp.byteLength + mdatHeaderSize;
+
+    // mvhd
+    var mvhdData = mp4Cat(
+        mp4Zeros(4),                                    // version + flags
+        mp4U32(0), mp4U32(0),                           // creation, modification time
+        mp4U32(movieTimescale), mp4U32(movieDuration),  // timescale, duration
+        mp4U32(0x00010000), mp4U16(0x0100),             // rate 1.0, volume 1.0
+        mp4Zeros(10),                                   // reserved
+        mp4U32(0x00010000), mp4Zeros(4), mp4Zeros(4),   // matrix row 1
+        mp4Zeros(4), mp4U32(0x00010000), mp4Zeros(4),   // matrix row 2
+        mp4Zeros(4), mp4Zeros(4), mp4U32(0x40000000),   // matrix row 3
+        mp4Zeros(24),                                   // pre-defined
+        mp4U32(2)                                       // next track ID
+    );
+    var mvhd = mp4Box('mvhd', mvhdData);
+
+    // tkhd
+    var tkhdData = mp4Cat(
+        new Uint8Array([0, 0, 0, 3]),                   // version=0, flags=3 (enabled+in_movie)
+        mp4U32(0), mp4U32(0),                           // creation, modification time
+        mp4U32(1),                                      // track ID
+        mp4Zeros(4),                                    // reserved
+        mp4U32(movieDuration),                          // duration (movie timescale)
+        mp4Zeros(8),                                    // reserved
+        mp4U16(0), mp4U16(0),                           // layer, alternate group
+        mp4U16(0), mp4Zeros(2),                         // volume (0 for video), reserved
+        mp4U32(0x00010000), mp4Zeros(4), mp4Zeros(4),   // matrix row 1
+        mp4Zeros(4), mp4U32(0x00010000), mp4Zeros(4),   // matrix row 2
+        mp4Zeros(4), mp4Zeros(4), mp4U32(0x40000000),   // matrix row 3
+        mp4U32(width << 16),                            // width (fixed 16.16)
+        mp4U32(height << 16)                            // height (fixed 16.16)
+    );
+    var tkhd = mp4Box('tkhd', tkhdData);
+
+    // mdhd
+    var mdhdData = mp4Cat(
+        mp4Zeros(4),                                    // version + flags
+        mp4U32(0), mp4U32(0),                           // creation, modification time
+        mp4U32(timescale), mp4U32(trackDuration),       // timescale, duration
+        mp4U16(0x55C4),                                 // language (und)
+        mp4Zeros(2)                                     // quality
+    );
+    var mdhd = mp4Box('mdhd', mdhdData);
+
+    // hdlr
+    var handlerName = new TextEncoder().encode('VideoHandler\0');
+    var hdlrData = mp4Cat(
+        mp4Zeros(4),                                    // version + flags
+        mp4Zeros(4),                                    // pre-defined
+        mp4S4('vide'),                                  // handler type
+        mp4Zeros(12),                                   // reserved
+        handlerName                                     // name
+    );
+    var hdlr = mp4Box('hdlr', hdlrData);
+
+    // vmhd
+    var vmhd = mp4Box('vmhd', mp4Cat(
+        new Uint8Array([0, 0, 0, 1]),                   // version=0, flags=1
+        mp4U16(0), mp4Zeros(6)                          // graphicsmode, opcolor
+    ));
+
+    // dinf > dref > url
+    var urlBox = mp4Box('url ', new Uint8Array([0, 0, 0, 1]));
+    var dref = mp4Box('dref', mp4Cat(mp4Zeros(4), mp4U32(1)), urlBox);
+    var dinf = mp4Box('dinf', dref);
+
+    // stsd > avc1 > avcC
+    var avcC = mp4Box('avcC', avcCData);
+    var compressorName = new Uint8Array(32); // all zeros
+    var avc1Content = mp4Cat(
+        mp4Zeros(6),                                    // reserved
+        mp4U16(1),                                      // data reference index
+        mp4U16(0), mp4U16(0),                           // pre-defined, reserved
+        mp4Zeros(12),                                   // pre-defined
+        mp4U16(width), mp4U16(height),                  // width, height
+        mp4U32(0x00480000), mp4U32(0x00480000),         // horiz/vert resolution 72dpi
+        mp4Zeros(4),                                    // reserved
+        mp4U16(1),                                      // frame count
+        compressorName,                                 // compressor name (32 bytes)
+        mp4U16(0x0018),                                 // depth (24)
+        new Uint8Array([0xFF, 0xFF])                    // pre-defined (-1)
+    );
+    var avc1 = mp4Box('avc1', avc1Content, avcC);
+    var stsd = mp4Box('stsd', mp4Cat(mp4Zeros(4), mp4U32(1)), avc1);
+
+    // stts
+    var stts = mp4Box('stts', mp4Cat(
+        mp4Zeros(4), mp4U32(1),                         // version+flags, entry count
+        mp4U32(totalSamples), mp4U32(sampleDuration)    // count, delta
+    ));
+
+    // stsc
+    var stsc = mp4Box('stsc', mp4Cat(
+        mp4Zeros(4), mp4U32(1),                         // version+flags, entry count
+        mp4U32(1), mp4U32(totalSamples), mp4U32(1)      // first_chunk, samples_per_chunk, desc_idx
+    ));
+
+    // stsz
+    var stszBuf = new Uint8Array(12 + totalSamples * 4);
+    var stszV = new DataView(stszBuf.buffer);
+    stszV.setUint32(4, 0);                              // sample_size=0 (variable)
+    stszV.setUint32(8, totalSamples);
+    for (var i = 0; i < totalSamples; i++) stszV.setUint32(12 + i * 4, sampleSizes[i]);
+    var stsz = mp4Box('stsz', stszBuf);
+
+    // stco
+    var stco = mp4Box('stco', mp4Cat(
+        mp4Zeros(4), mp4U32(1), mp4U32(chunkOffset)
+    ));
+
+    // stss (sync samples / keyframes)
+    var stssBuf = new Uint8Array(8 + keyFrames.length * 4);
+    var stssV = new DataView(stssBuf.buffer);
+    stssV.setUint32(4, keyFrames.length);
+    for (var i = 0; i < keyFrames.length; i++) stssV.setUint32(8 + i * 4, keyFrames[i]);
+    var stss = mp4Box('stss', stssBuf);
+
+    // Assemble
+    var stbl = mp4Box('stbl', stsd, stts, stsc, stsz, stco, stss);
+    var minf = mp4Box('minf', vmhd, dinf, stbl);
+    var mdia = mp4Box('mdia', mdhd, hdlr, minf);
+    var trak = mp4Box('trak', tkhd, mdia);
+    var moov = mp4Box('moov', mvhd, trak);
+
+    // mdat header
+    var mdatHeader = new Uint8Array(8);
+    var mhv = new DataView(mdatHeader.buffer);
+    mhv.setUint32(0, mdatHeaderSize + mdatContentSize);
+    mdatHeader[4] = 0x6D; mdatHeader[5] = 0x64; mdatHeader[6] = 0x61; mdatHeader[7] = 0x74; // 'mdat'
+
+    // mdat content
+    var mdatContent = new Uint8Array(mdatContentSize);
+    var mOff = 0;
+    for (var i = 0; i < totalSamples; i++) {
+        mdatContent.set(encodedSamples[i].data, mOff);
+        mOff += encodedSamples[i].data.byteLength;
+    }
+
+    // Final file: ftyp + mdat + moov
+    return mp4Cat(ftyp, mdatHeader, mdatContent, moov);
+}
+
+// -- WebCodecs-based Video Export (proper H.264 MP4/MOV) -----------
+
+async function exportVideoWebCodecs(format) {
+    // Check WebCodecs support
+    if (typeof VideoEncoder === 'undefined' || typeof VideoFrame === 'undefined') {
+        alert('Your browser does not support WebCodecs API (required for ' + format.toUpperCase() + ').\n'
+            + 'Please use Chrome/Edge 94+ or Safari 16.4+.\n'
+            + 'Alternatively, use PNG/JPG Sequence export for DaVinci Resolve.');
+        return;
+    }
+
+    var dims = getOutputDimensions();
+    var scale = STATE.exportScale;
+    var w = Math.round(dims.w * scale);
+    var h = Math.round(dims.h * scale);
+    // H.264 requires even dimensions
+    if (w % 2 !== 0) w++;
+    if (h % 2 !== 0) h++;
+
+    var fps = STATE.animation.fps;
+    // For video sources: use video duration for frame count if animation is disabled
+    var totalFrames = STATE.animation.frameCount;
+    if (STATE.sourceType === 'video' && STATE.sourceVideo && !STATE.animation.enabled) {
+        var vidDur = STATE.sourceVideo.duration;
+        if (vidDur > 0 && vidDur <= 30) {
+            totalFrames = Math.round(vidDur * fps);
+        }
+        // >30s: use the existing frameCount (renders a snippet of that duration)
+    }
+    var isVideo = STATE.sourceType === 'video' && STATE.sourceVideo;
+    var videoDuration = isVideo ? STATE.sourceVideo.duration : 0;
+
+    var wasAnimRunning = animRunning;
+    if (wasAnimRunning) stopAnimation();
+    if (isVideo && !STATE.sourceVideo.paused) STATE.sourceVideo.pause();
+    stopVideoRenderLoop();
+    var videoStartTime = isVideo ? STATE.sourceVideo.currentTime : 0;
+
+    var formatLabel = format.toUpperCase();
+    showProgress('Encoding ' + formatLabel + ' (0/' + totalFrames + ')...');
+
+    var encodedSamples = [];
+    var avcCData = null;
+    var encodeError = null;
+
+    var encoder = new VideoEncoder({
+        output: function(chunk, metadata) {
+            var data = new Uint8Array(chunk.byteLength);
+            chunk.copyTo(data);
+            encodedSamples.push({ data: data, isKey: chunk.type === 'key' });
+            if (!avcCData && metadata && metadata.decoderConfig && metadata.decoderConfig.description) {
+                avcCData = new Uint8Array(metadata.decoderConfig.description);
+            }
+        },
+        error: function(e) {
+            console.error('VideoEncoder error:', e);
+            encodeError = e;
+        }
+    });
+
+    // Choose codec profile based on resolution
+    var codecString = 'avc1.42001f'; // Baseline Level 3.1
+    if (w > 1280 || h > 720) codecString = 'avc1.640028'; // High Level 4.0
+    if (w > 1920 || h > 1080) codecString = 'avc1.640032'; // High Level 5.0
+
+    try {
+        encoder.configure({
+            codec: codecString,
+            width: w,
+            height: h,
+            bitrate: 8000000,
+            framerate: fps,
+            avc: { format: 'avc' }  // NAL units with length prefix (MP4-compatible)
+        });
+    } catch (e) {
+        hideProgress();
+        alert('Failed to configure H.264 encoder: ' + e.message + '\nTry PNG/JPG Sequence export instead.');
+        return;
+    }
+
+    var tmpCanvas = document.createElement('canvas');
+    var viewMode = STATE.viewMode;
+    var gopSize = Math.max(1, Math.round(fps)); // Keyframe every ~1 second
+
+    for (var frame = 0; frame < totalFrames; frame++) {
+        if (encodeError) break;
+
+        if (isVideo) {
+            var targetTime = (videoStartTime + frame / fps) % videoDuration;
+            await new Promise(function(resolve) {
+                STATE.sourceVideo.currentTime = targetTime;
+                STATE.sourceVideo.addEventListener('seeked', resolve, { once: true });
+            });
+        }
+
+        renderExportFrame(tmpCanvas, w, h, frame, viewMode);
+
+        var videoFrame = new VideoFrame(tmpCanvas, {
+            timestamp: Math.round(frame * (1000000 / fps)),
+            duration: Math.round(1000000 / fps)
+        });
+
+        encoder.encode(videoFrame, { keyFrame: (frame % gopSize === 0) });
+        videoFrame.close();
+
+        updateProgress(frame / totalFrames * 0.7);
+        document.getElementById('progressText').textContent =
+            'Encoding ' + formatLabel + ' (' + (frame + 1) + '/' + totalFrames + ')...';
+
+        if (frame % 4 === 0) await new Promise(function(r) { requestAnimationFrame(r); });
+    }
+
+    await encoder.flush();
+    encoder.close();
+
+    if (encodeError || !avcCData || encodedSamples.length === 0) {
+        hideProgress();
+        alert('Failed to encode video. Try PNG/JPG Sequence export instead.');
+        if (isVideo) STATE.sourceVideo.currentTime = videoStartTime;
+        return;
+    }
+
+    document.getElementById('progressText').textContent = 'Muxing ' + formatLabel + '...';
+    updateProgress(0.85);
+    await new Promise(function(r) { setTimeout(r, 50); });
+
+    var fileData = muxToMP4(encodedSamples, avcCData, w, h, fps, format === 'mov');
+
+    var blobType = format === 'mov' ? 'video/quicktime' : 'video/mp4';
+    var blob = new Blob([fileData], { type: blobType });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'glyphgarden_' + Date.now() + '.' + format;
+    a.click();
+    URL.revokeObjectURL(url);
+    hideProgress();
+
+    if (isVideo) STATE.sourceVideo.currentTime = videoStartTime;
+}
+
+// -- MediaRecorder-based export (used for WebM) --------------------
+
+async function exportVideoMediaRecorder(format) {
+    const { w: baseW, h: baseH } = getOutputDimensions();
+    const scale = STATE.exportScale;
+    const w = Math.round(baseW * scale);
+    const h = Math.round(baseH * scale);
+    const fps = STATE.animation.fps;
+    // For video sources: use video duration if animation disabled and video is short
+    let totalFrames = STATE.animation.frameCount;
+    if (STATE.sourceType === 'video' && STATE.sourceVideo && !STATE.animation.enabled) {
+        const vidDur = STATE.sourceVideo.duration;
+        if (vidDur > 0 && vidDur <= 30) {
+            totalFrames = Math.round(vidDur * fps);
+        }
+    }
+    const isVideo = STATE.sourceType === 'video' && STATE.sourceVideo;
+    const videoDuration = isVideo ? STATE.sourceVideo.duration : 0;
+
+    const wasAnimRunning = animRunning;
+    const wasVideoPlaying = isVideo && !STATE.sourceVideo.paused;
+    if (wasAnimRunning) stopAnimation();
+    if (wasVideoPlaying) STATE.sourceVideo.pause();
+    stopVideoRenderLoop();
+
+    const videoStartTime = isVideo ? STATE.sourceVideo.currentTime : 0;
+    const formatLabel = format.toUpperCase();
+    showProgress('Rendering ' + formatLabel + ' frames (0/' + totalFrames + ')...');
+
+    const frames = [];
+    const tmpCanvas = document.createElement('canvas');
+    const viewMode = STATE.viewMode;
+
+    for (let frame = 0; frame < totalFrames; frame++) {
+        if (isVideo) {
+            const targetTime = (videoStartTime + frame / fps) % videoDuration;
+            await new Promise(function(resolve) {
+                STATE.sourceVideo.currentTime = targetTime;
+                STATE.sourceVideo.addEventListener('seeked', resolve, { once: true });
+            });
+        }
+
+        renderExportFrame(tmpCanvas, w, h, frame, viewMode);
+        const tmpCtx = tmpCanvas.getContext('2d', { willReadFrequently: true });
+        frames.push(tmpCtx.getImageData(0, 0, w, h));
+
+        updateProgress((frame / totalFrames) * 0.5);
+        document.getElementById('progressText').textContent =
+            'Rendering frames (' + (frame + 1) + '/' + totalFrames + ')...';
+
+        if (frame % 4 === 0) await new Promise(function(r) { requestAnimationFrame(r); });
+    }
+
+    document.getElementById('progressText').textContent = 'Encoding ' + formatLabel + '...';
+    updateProgress(0.55);
+
+    const exportCanvas = document.createElement('canvas');
+    exportCanvas.width = w;
+    exportCanvas.height = h;
+    const exportCtx = exportCanvas.getContext('2d', { willReadFrequently: true });
+    const stream = exportCanvas.captureStream(fps);
+
+    let mimeType = 'video/webm;codecs=vp9';
+    if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'video/webm';
+    }
+
+    const recorder = new MediaRecorder(stream, {
+        mimeType: mimeType,
+        videoBitsPerSecond: 8000000
+    });
+
+    const chunks = [];
+    recorder.ondataavailable = function(e) { if (e.data.size > 0) chunks.push(e.data); };
+
+    return new Promise(function(resolve) {
+        recorder.onstop = function() {
+            const blob = new Blob(chunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'glyphgarden_' + Date.now() + '.webm';
+            a.click();
+            URL.revokeObjectURL(url);
+            hideProgress();
+            if (isVideo) STATE.sourceVideo.currentTime = videoStartTime;
+            resolve();
+        };
+
+        recorder.start();
+
+        const frameInterval = 1000 / fps;
+        let frameIndex = 0;
+        const startTime = performance.now();
+
+        function feedNextFrame() {
+            if (frameIndex >= frames.length) {
+                recorder.stop();
+                return;
+            }
+            exportCtx.putImageData(frames[frameIndex], 0, 0);
+            updateProgress(0.55 + (frameIndex / frames.length) * 0.45);
+            frameIndex++;
+            const nextTime = startTime + frameIndex * frameInterval;
+            const delay = Math.max(1, nextTime - performance.now());
+            setTimeout(feedNextFrame, delay);
+        }
+
+        feedNextFrame();
+    });
+}
+
+// -- Export: GIF (simple implementation) ----------------------------
+
+async function exportGIF() {
+    const { w: baseW, h: baseH } = getOutputDimensions();
+    // GIF: use smaller resolution
+    const maxGifDim = 600;
+    const ratio = baseW / baseH;
+    let w, h;
+    if (ratio >= 1) {
+        w = Math.min(baseW, maxGifDim);
+        h = Math.round(w / ratio);
+    } else {
+        h = Math.min(baseH, maxGifDim);
+        w = Math.round(h * ratio);
+    }
+    // Ensure even dimensions
+    w = w & ~1;
+    h = h & ~1;
+
+    const fps = STATE.animation.fps;
+    // For video sources: use video duration if short, else use frameCount
+    let totalFramesBase = STATE.animation.frameCount;
+    if (STATE.sourceType === 'video' && STATE.sourceVideo && !STATE.animation.enabled) {
+        const vidDur = STATE.sourceVideo.duration;
+        if (vidDur > 0 && vidDur <= 30) {
+            totalFramesBase = Math.round(vidDur * fps);
+        }
+    }
+    const totalFrames = Math.min(totalFramesBase, 120); // Cap for GIF
+
+    const isVideo = STATE.sourceType === 'video' && STATE.sourceVideo;
+    const videoDuration = isVideo ? STATE.sourceVideo.duration : 0;
+
+    // Pause everything during export
+    const wasAnimRunning = animRunning;
+    const wasVideoPlaying = isVideo && !STATE.sourceVideo.paused;
+    if (wasAnimRunning) stopAnimation();
+    if (wasVideoPlaying) STATE.sourceVideo.pause();
+    stopVideoRenderLoop();
+
+    const videoStartTime = isVideo ? STATE.sourceVideo.currentTime : 0;
+
+    showProgress('Exporting GIF (0/' + totalFrames + ')...');
+
+    // Collect frames as ImageData
+    const frames = [];
+    const viewMode = STATE.viewMode;
+
+    const tmpCanvas = document.createElement('canvas');
+
+    for (let frame = 0; frame < totalFrames; frame++) {
+        // For video sources: seek at real-time rate from current position
+        if (isVideo) {
+            const targetTime = (videoStartTime + frame / fps) % videoDuration;
+            await new Promise(function(resolve) {
+                STATE.sourceVideo.currentTime = targetTime;
+                STATE.sourceVideo.addEventListener('seeked', resolve, { once: true });
+            });
+        }
+
+        renderExportFrame(tmpCanvas, w, h, frame, viewMode);
+
+        const tmpCtx = tmpCanvas.getContext('2d', { willReadFrequently: true });
+        frames.push(tmpCtx.getImageData(0, 0, w, h));
+
+        updateProgress(frame / totalFrames * 0.5);
+        document.getElementById('progressText').textContent =
+            'Rendering frames (' + (frame + 1) + '/' + totalFrames + ')...';
+
+        if (frame % 3 === 0) await new Promise(function(r) { requestAnimationFrame(r); });
+    }
+
+    // Encode GIF using a minimal encoder
+    // GIF delay is in centiseconds (1/100s). Use ceil to avoid too-fast playback.
+    document.getElementById('progressText').textContent = 'Encoding GIF...';
+    updateProgress(0.6);
+    await new Promise(function(r) { setTimeout(r, 50); });
+
+    const delayMs = 1000 / fps;
+    const delayCentiseconds = Math.max(2, Math.ceil(delayMs / 10)); // ceil → slightly slow > too fast
+    const gifData = encodeGIF(frames, w, h, delayCentiseconds);
+
+    const blob = new Blob([gifData], { type: 'image/gif' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'glyphgarden_' + Date.now() + '.gif';
+    a.click();
+    URL.revokeObjectURL(url);
+    hideProgress();
+
+    // Restore video position
+    if (isVideo) STATE.sourceVideo.currentTime = videoStartTime;
+}
+
+// -- Minimal GIF Encoder (B&W only, no external deps) --------------
+
+function encodeGIF(frames, width, height, delayCentiseconds) {
+    // GIF89a format - B&W palette (2 colors)
+    // delayCentiseconds: delay per frame in 1/100ths of a second
+    const buf = [];
+    function writeByte(b) { buf.push(b & 0xFF); }
+    function writeShort(s) { writeByte(s & 0xFF); writeByte((s >> 8) & 0xFF); }
+    function writeString(s) { for (let i = 0; i < s.length; i++) writeByte(s.charCodeAt(i)); }
+
+    // Header
+    writeString('GIF89a');
+
+    // Logical Screen Descriptor
+    writeShort(width);
+    writeShort(height);
+    writeByte(0x80); // GCT flag, 2 colors (1 bit)
+    writeByte(0);    // Background color index
+    writeByte(0);    // Pixel aspect ratio
+
+    // Global Color Table (2 entries: black, white)
+    writeByte(0); writeByte(0); writeByte(0);       // Black
+    writeByte(255); writeByte(255); writeByte(255);  // White
+
+    // Netscape Application Extension (for looping)
+    writeByte(0x21); // Extension
+    writeByte(0xFF); // Application
+    writeByte(11);   // Block size
+    writeString('NETSCAPE2.0');
+    writeByte(3);    // Sub-block size
+    writeByte(1);    // Loop count sub-block ID
+    writeShort(0);   // Loop count (0 = infinite)
+    writeByte(0);    // Terminator
+
+    for (let f = 0; f < frames.length; f++) {
+        const frameData = frames[f].data;
+
+        // Graphic Control Extension
+        writeByte(0x21); // Extension
+        writeByte(0xF9); // GCE
+        writeByte(4);    // Block size
+        writeByte(0);    // No transparency
+        writeShort(delayCentiseconds); // Delay in 1/100ths of second
+        writeByte(0);    // Transparent color index
+        writeByte(0);    // Terminator
+
+        // Image Descriptor
+        writeByte(0x2C);
+        writeShort(0); // Left
+        writeShort(0); // Top
+        writeShort(width);
+        writeShort(height);
+        writeByte(0); // No LCT
+
+        // LZW Minimum Code Size
+        var minCodeSize = 2; // Minimum for GIF
+        writeByte(minCodeSize);
+
+        // LZW compress the frame (B&W indexed)
+        var pixels = new Uint8Array(width * height);
+        for (let i = 0; i < width * height; i++) {
+            // Convert RGBA to 0 (black) or 1 (white)
+            pixels[i] = frameData[i * 4] > 127 ? 1 : 0;
+        }
+
+        var compressed = lzwEncode(pixels, minCodeSize);
+
+        // Write sub-blocks
+        var offset = 0;
+        while (offset < compressed.length) {
+            var chunkSize = Math.min(255, compressed.length - offset);
+            writeByte(chunkSize);
+            for (let i = 0; i < chunkSize; i++) {
+                writeByte(compressed[offset + i]);
+            }
+            offset += chunkSize;
+        }
+        writeByte(0); // Block terminator
+    }
+
+    // Trailer
+    writeByte(0x3B);
+
+    return new Uint8Array(buf);
+}
+
+function lzwEncode(pixels, minCodeSize) {
+    var clearCode = 1 << minCodeSize;
+    var eoiCode = clearCode + 1;
+    var codeSize = minCodeSize + 1;
+    var nextCode = eoiCode + 1;
+    var maxCode = 4096;
+
+    // Initialize dictionary
+    var dict = new Map();
+    for (let i = 0; i < clearCode; i++) {
+        dict.set(String(i), i);
+    }
+
+    var output = [];
+    var bits = 0;
+    var bitCount = 0;
+
+    function emitCode(code) {
+        bits |= (code << bitCount);
+        bitCount += codeSize;
+        while (bitCount >= 8) {
+            output.push(bits & 0xFF);
+            bits >>= 8;
+            bitCount -= 8;
+        }
+    }
+
+    // Emit clear code
+    emitCode(clearCode);
+
+    var current = String(pixels[0]);
+
+    for (let i = 1; i < pixels.length; i++) {
+        var next = current + ',' + pixels[i];
+        if (dict.has(next)) {
+            current = next;
+        } else {
+            emitCode(dict.get(current));
+            if (nextCode < maxCode) {
+                dict.set(next, nextCode++);
+                if (nextCode > (1 << codeSize) && codeSize < 12) {
+                    codeSize++;
+                }
+            } else {
+                // Reset dictionary
+                emitCode(clearCode);
+                dict = new Map();
+                for (let j = 0; j < clearCode; j++) {
+                    dict.set(String(j), j);
+                }
+                nextCode = eoiCode + 1;
+                codeSize = minCodeSize + 1;
+            }
+            current = String(pixels[i]);
+        }
+    }
+
+    emitCode(dict.get(current));
+    emitCode(eoiCode);
+
+    // Flush remaining bits
+    if (bitCount > 0) {
+        output.push(bits & 0xFF);
+    }
+
+    return output;
+}
+
+// -- Progress UI ---------------------------------------------------
+
+function showProgress(text) {
+    document.getElementById('progressOverlay').classList.remove('hidden');
+    document.getElementById('progressText').textContent = text;
+    document.getElementById('progressFill').style.width = '0%';
+}
+
+function updateProgress(fraction) {
+    document.getElementById('progressFill').style.width = Math.round(fraction * 100) + '%';
+}
+
+function hideProgress() {
+    document.getElementById('progressOverlay').classList.add('hidden');
+}
+
+// -- UI Wiring -----------------------------------------------------
+
+function wireControls() {
+    // Upload
+    var uploadArea = document.getElementById('uploadArea');
+    var fileInput = document.getElementById('fileInput');
+
+    uploadArea.addEventListener('click', function() { fileInput.click(); });
+    uploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        uploadArea.classList.add('dragover');
+    });
+    uploadArea.addEventListener('dragleave', function() { uploadArea.classList.remove('dragover'); });
+    uploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', function() {
+        if (fileInput.files[0]) loadFile(fileInput.files[0]);
+    });
+
+    // Also allow drop on the entire viewport
+    var viewport = document.querySelector('.viewport');
+    viewport.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+    });
+    viewport.addEventListener('drop', function(e) {
+        e.preventDefault();
+        if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
+    });
+
+    // Video play/pause controls
+    document.getElementById('videoPlayPause').addEventListener('click', function() {
+        if (!STATE.sourceVideo) return;
+        if (STATE.sourceVideo.paused) {
+            STATE.sourceVideo.play();
+            this.innerHTML = '&#9646;&#9646; Pause';
+            // Start a render loop for video playback
+            startVideoRenderLoop();
+        } else {
+            STATE.sourceVideo.pause();
+            this.innerHTML = '&#9654; Play';
+            stopVideoRenderLoop();
+        }
+    });
+    document.getElementById('videoStop').addEventListener('click', function() {
+        if (!STATE.sourceVideo) return;
+        STATE.sourceVideo.pause();
+        STATE.sourceVideo.currentTime = 0;
+        document.getElementById('videoPlayPause').innerHTML = '&#9654; Play';
+        stopVideoRenderLoop();
+        scheduleRender();
+    });
+
+    // Aspect ratio
+    document.getElementById('aspectRatio').addEventListener('change', function(e) {
+        STATE.aspectRatio = e.target.value;
+        updateOutputDims();
+        scheduleRender();
+    });
+
+    // Export scale
+    document.querySelectorAll('.res-preset').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.res-preset').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            STATE.exportScale = parseFloat(btn.dataset.scale);
+            updateOutputDims();
+            // In full preview mode, scale affects preview dimensions
+            if (STATE.previewQuality === 'full') {
+                performanceChecked = false;
+                scheduleRender();
+            }
+        });
+    });
+
+    // Preview quality
+    document.getElementById('previewQuality').addEventListener('change', function(e) {
+        STATE.previewQuality = e.target.value;
+        performanceChecked = false;
+        scheduleRender();
+    });
+
+    // Glyph layer
+    wireSlider('gridCols', function(v) { STATE.glyph.gridCols = parseInt(v); });
+    wireSlider('bgOpacity', function(v) { STATE.glyph.bgOpacity = parseFloat(v) / 100; }, function(v) { return v + '%'; });
+    wireSlider('decimalPrecision', function(v) { STATE.glyph.decimalPrecision = parseInt(v); });
+    wireSlider('randomize', function(v) { STATE.glyph.randomize = parseInt(v); }, function(v) { return v + '%'; });
+
+    document.getElementById('charSet').addEventListener('change', function(e) {
+        STATE.glyph.charSet = e.target.value;
+        document.getElementById('customCharsRow').classList.toggle('hidden', e.target.value !== 'custom');
+        document.getElementById('precisionRow').style.display = e.target.value === 'luminosity' ? '' : 'none';
+        scheduleRender();
+    });
+
+    document.getElementById('customChars').addEventListener('change', function(e) {
+        STATE.glyph.customChars = e.target.value;
+        scheduleRender();
+    });
+
+    document.getElementById('charColor').addEventListener('input', function(e) {
+        STATE.glyph.charColor = e.target.value;
+        scheduleRender();
+    });
+
+    document.getElementById('bgColor').addEventListener('input', function(e) {
+        STATE.glyph.bgColor = e.target.value;
+        scheduleRender();
+    });
+
+    document.getElementById('fontFamily').addEventListener('change', function(e) {
+        if (e.target.value === 'custom') {
+            document.getElementById('customFontRow').classList.remove('hidden');
+            STATE.glyph.fontFamily = document.getElementById('customFont').value || '';
+        } else {
+            document.getElementById('customFontRow').classList.add('hidden');
+            STATE.glyph.fontFamily = e.target.value;
+        }
+        scheduleRender();
+    });
+
+    document.getElementById('customFont').addEventListener('change', function(e) {
+        STATE.glyph.fontFamily = e.target.value;
+        scheduleRender();
+    });
+
+    // Image layer
+    wireSlider('preBlur', function(v) { STATE.image.preBlur = parseFloat(v); });
+    wireSlider('brightness', function(v) { STATE.image.brightness = parseFloat(v); }, function(v) { return parseFloat(v).toFixed(2); });
+    wireSlider('contrast', function(v) { STATE.image.contrast = parseFloat(v); }, function(v) { return parseFloat(v).toFixed(2); });
+    wireSlider('gamma', function(v) { STATE.image.gamma = parseFloat(v); }, function(v) { return parseFloat(v).toFixed(2); });
+    wireSlider('ditherScale', function(v) { STATE.image.ditherScale = parseInt(v); });
+
+    document.getElementById('ditherMethod').addEventListener('change', function(e) {
+        STATE.image.ditherMethod = e.target.value;
+        scheduleRender();
+    });
+
+    // Mask
+    wireSlider('maskThreshold', function(v) { STATE.mask.threshold = parseInt(v); });
+    wireSlider('maskBlur', function(v) { STATE.mask.blur = parseInt(v); });
+    wireSlider('coverage', function(v) { STATE.mask.coverage = parseInt(v); }, function(v) { return v + '%'; });
+    wireSlider('mix', function(v) { STATE.mask.mix = parseInt(v); }, function(v) { return v + '%'; });
+
+    document.getElementById('maskMode').addEventListener('change', function(e) {
+        STATE.mask.mode = e.target.value;
+        scheduleRender();
+    });
+
+    document.getElementById('maskInvert').addEventListener('change', function(e) {
+        STATE.mask.invert = e.target.checked;
+        // When invert is toggled, swap char color and bg color
+        var charColorEl = document.getElementById('charColor');
+        var bgColorEl = document.getElementById('bgColor');
+        var tmpColor = charColorEl.value;
+        charColorEl.value = bgColorEl.value;
+        bgColorEl.value = tmpColor;
+        STATE.glyph.charColor = charColorEl.value;
+        STATE.glyph.bgColor = bgColorEl.value;
+        scheduleRender();
+    });
+
+    // Animation
+    document.getElementById('animEnable').addEventListener('change', function(e) {
+        STATE.animation.enabled = e.target.checked;
+        document.getElementById('animControls').classList.toggle('hidden', !e.target.checked);
+        // Always show video export buttons for video sources (they export video frames regardless of animation)
+        var showVideoExport = e.target.checked || STATE.sourceType === 'video';
+        document.getElementById('animExportRow').style.display = showVideoExport ? 'block' : 'none';
+        if (!e.target.checked) stopAnimation();
+    });
+
+    document.getElementById('animPlay').addEventListener('click', function() {
+        if (animRunning) stopAnimation();
+        else startAnimation();
+    });
+
+    document.getElementById('animStop').addEventListener('click', function() { stopAnimation(); });
+
+    wireSlider('animSpeed', function(v) { STATE.animation.speed = parseFloat(v); }, function(v) { return parseFloat(v).toFixed(1); }, false);
+    wireSlider('temporalVar', function(v) { STATE.animation.temporalVariation = parseInt(v) / 100; }, function(v) { return v + '%'; }, false);
+    wireSlider('glyphDrift', function(v) { STATE.animation.glyphDrift = parseFloat(v); }, null, false);
+    wireSlider('frameCount', function(v) { STATE.animation.frameCount = parseInt(v); updateAnimDuration(); }, null, false);
+
+    document.getElementById('animFps').addEventListener('change', function(e) {
+        STATE.animation.fps = parseInt(e.target.value);
+        updateAnimDuration();
+    });
+
+    // Export
+    document.getElementById('exportPng').addEventListener('click', exportPNG);
+    document.getElementById('exportWebm').addEventListener('click', exportWebM);
+    document.getElementById('exportMp4').addEventListener('click', exportMP4);
+    document.getElementById('exportMov').addEventListener('click', exportMOV);
+    document.getElementById('exportGif').addEventListener('click', exportGIF);
+    document.getElementById('exportPngSeq').addEventListener('click', function() { exportImageSequence('png'); });
+    document.getElementById('exportJpgSeq').addEventListener('click', function() { exportImageSequence('jpeg'); });
+
+    // Global
+    document.getElementById('seed').addEventListener('change', function(e) {
+        STATE.seed = parseInt(e.target.value) || 0;
+        scheduleRender();
+    });
+
+    document.getElementById('randomSeed').addEventListener('click', function() {
+        var seed = Math.floor(Math.random() * 10000);
+        STATE.seed = seed;
+        document.getElementById('seed').value = seed;
+        scheduleRender();
+    });
+
+    // View modes
+    document.querySelectorAll('.view-mode-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.view-mode-btn').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            STATE.viewMode = btn.dataset.view;
+            scheduleRender();
+        });
+    });
+
+    // Reset
+    document.getElementById('resetBtn').addEventListener('click', resetAll);
+
+    // Set initial UI state for charSet default (ascii)
+    document.getElementById('precisionRow').style.display = 'none';
+}
+
+// Video render loop for live playback preview
+var videoRenderLoopId = null;
+function startVideoRenderLoop() {
+    if (videoRenderLoopId) return;
+    function loop() {
+        if (STATE.sourceVideo && !STATE.sourceVideo.paused) {
+            render();
+            videoRenderLoopId = requestAnimationFrame(loop);
+        } else {
+            videoRenderLoopId = null;
+        }
+    }
+    videoRenderLoopId = requestAnimationFrame(loop);
+}
+
+function stopVideoRenderLoop() {
+    if (videoRenderLoopId) {
+        cancelAnimationFrame(videoRenderLoopId);
+        videoRenderLoopId = null;
+    }
+}
+
+function wireSlider(id, setter, formatter, triggerRender) {
+    if (triggerRender === undefined) triggerRender = true;
+    var el = document.getElementById(id);
+    var valEl = document.getElementById(id + 'Val');
+    el.addEventListener('input', function() {
+        setter(el.value);
+        if (valEl) valEl.textContent = formatter ? formatter(el.value) : el.value;
+        if (triggerRender) scheduleRender();
+    });
+}
+
+function resetAll() {
+    // Reset state to defaults
+    STATE.glyph = { charSet: 'ascii', customChars: ' .:-=+*#%@', gridCols: 100, charColor: '#ffffff', bgColor: '#000000', bgOpacity: 1.0, fontFamily: '', decimalPrecision: 2, randomize: 0 };
+    STATE.image = { preBlur: 0, brightness: 1.0, contrast: 1.5, gamma: 1.0, ditherMethod: 'floyd-steinberg', ditherScale: 2 };
+    STATE.mask = { mode: 'luminosity', threshold: 128, invert: false, blur: 0, coverage: 50, mix: 50 };
+    STATE.animation = { enabled: true, speed: 0.1, temporalVariation: 0, glyphDrift: 0, frameCount: 120, fps: 30 };
+    STATE.seed = 42;
+    STATE.viewMode = 'processed';
+    STATE.aspectRatio = 'original';
+    STATE.exportScale = 1;
+    STATE.previewQuality = 'full';
+
+    // Reset UI elements
+    document.getElementById('gridCols').value = 100; document.getElementById('gridColsVal').textContent = '100';
+    document.getElementById('bgOpacity').value = 100; document.getElementById('bgOpacityVal').textContent = '100%';
+    document.getElementById('decimalPrecision').value = 2; document.getElementById('decimalPrecisionVal').textContent = '2';
+    document.getElementById('randomize').value = 0; document.getElementById('randomizeVal').textContent = '0%';
+    document.getElementById('charSet').value = 'ascii';
+    document.getElementById('charColor').value = '#ffffff';
+    document.getElementById('bgColor').value = '#000000';
+    document.getElementById('fontFamily').value = '';
+    document.getElementById('customFontRow').classList.add('hidden');
+    document.getElementById('customCharsRow').classList.add('hidden');
+    document.getElementById('precisionRow').style.display = 'none';
+
+    document.getElementById('preBlur').value = 0; document.getElementById('preBlurVal').textContent = '0';
+    document.getElementById('brightness').value = 1.0; document.getElementById('brightnessVal').textContent = '1.00';
+    document.getElementById('contrast').value = 1.5; document.getElementById('contrastVal').textContent = '1.50';
+    document.getElementById('gamma').value = 1.0; document.getElementById('gammaVal').textContent = '1.00';
+    document.getElementById('ditherMethod').value = 'floyd-steinberg';
+    document.getElementById('ditherScale').value = 2; document.getElementById('ditherScaleVal').textContent = '2';
+
+    document.getElementById('maskMode').value = 'luminosity';
+    document.getElementById('maskThreshold').value = 128; document.getElementById('maskThresholdVal').textContent = '128';
+    document.getElementById('maskInvert').checked = false;
+    document.getElementById('maskBlur').value = 0; document.getElementById('maskBlurVal').textContent = '0';
+    document.getElementById('coverage').value = 50; document.getElementById('coverageVal').textContent = '50%';
+    document.getElementById('mix').value = 50; document.getElementById('mixVal').textContent = '50%';
+
+    document.getElementById('animEnable').checked = true;
+    document.getElementById('animControls').classList.remove('hidden');
+    document.getElementById('animExportRow').style.display = 'block';
+    document.getElementById('animSpeed').value = 0.1; document.getElementById('animSpeedVal').textContent = '0.1';
+    document.getElementById('temporalVar').value = 0; document.getElementById('temporalVarVal').textContent = '0%';
+    document.getElementById('glyphDrift').value = 0; document.getElementById('glyphDriftVal').textContent = '0';
+    document.getElementById('frameCount').value = 120; document.getElementById('frameCountVal').textContent = '120';
+    document.getElementById('animFps').value = 30;
+
+    document.getElementById('seed').value = 42;
+    document.getElementById('aspectRatio').value = 'original';
+    document.getElementById('previewQuality').value = 'full';
+
+    document.querySelectorAll('.res-preset').forEach(function(b) { b.classList.remove('active'); });
+    document.querySelector('.res-preset[data-scale="1"]').classList.add('active');
+
+    document.querySelectorAll('.view-mode-btn').forEach(function(b) { b.classList.remove('active'); });
+    document.querySelector('.view-mode-btn[data-view="processed"]').classList.add('active');
+
+    stopAnimation();
+    performanceChecked = false;
+    updateOutputDims();
+    scheduleRender();
+}
+
+// -- Init ----------------------------------------------------------
+
+wireControls();
+</script>
+</body>
+</html>
